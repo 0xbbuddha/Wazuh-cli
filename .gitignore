@@ -1,2 +1,4 @@
-vendor/
 build/
+*.exe
+wazuh-cli
+

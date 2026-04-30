@@ -1,17 +1,26 @@
-NAME := wazuh-cli
+NAME    := wazuh-cli
+VERSION := $(shell git describe --tags --always --dirty 2>/dev/null || echo "dev")
+LDFLAGS := -ldflags "-X main.version=$(VERSION)"
+OSES    := linux darwin
 
-clean:
-	-rm -rf build/
+.PHONY: build clean install lint test
 
 build:
-	for os in darwin linux; do \
-		for arch in amd64 386; do \
-		  GOOS=$$os GOARCH=$$arch go build -o build/$$os-$$arch/$(NAME) wazuh-cli.go; \
-		done;\
+	@mkdir -p build
+	@for os in $(OSES); do \
+		out=build/$$os-amd64/$(NAME); \
+		echo "Building $$out..."; \
+		GOOS=$$os GOARCH=amd64 go build $(LDFLAGS) -o $$out .; \
 	done
 
 install:
-	dep ensure
+	go install $(LDFLAGS) .
 
-update:
-	dep ensure -update
+clean:
+	rm -rf build/
+
+lint:
+	golangci-lint run ./...
+
+test:
+	go test ./...
