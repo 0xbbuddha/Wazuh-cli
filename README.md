@@ -67,8 +67,7 @@ username = "kibanaserver"
 password = "kibanaserver"
 ```
 
-> The `[auth]` credentials are Wazuh Manager API users (port 55000), not the Dashboard/Indexer login.
-> To test them: `curl -k -u wazuh:wazuh -X POST "https://localhost:55000/security/user/authenticate?raw=true"`
+> Credentials can be found in `/usr/share/wazuh-dashboard/data/wazuh/config/wazuh.yml` on the manager.
 
 ---
 
