@@ -1,6 +1,6 @@
 # wazuh-cli
 
-A command-line interface for the **Wazuh REST API** (v4.x), written in Go.
+Command-line interface for the **Wazuh REST API** (v4.x), written in Go.
 
 ```
   ██╗    ██╗ █████╗ ███████╗██╗   ██╗██╗  ██╗    ██████╗██╗     ██╗
@@ -19,6 +19,7 @@ A command-line interface for the **Wazuh REST API** (v4.x), written in Go.
 - Colored table output (status, severity, alert levels)
 - `--output json` flag on every command for scripting
 - Covers the **Wazuh Manager API** (port 55000) and the **Wazuh Indexer / OpenSearch** (port 9200) for alerts
+
 
 ---
 
@@ -56,18 +57,18 @@ api_url  = "https://wazuh-manager:55000"
 insecure = true   # set to true if using a self-signed certificate
 
 [auth]
-username = "wazuh"
-password = "wazuh"
+username = "wazuh-wui"
+password = "wazuh-wui"
 
-# Optional — required only for the `alerts` commands
+# optional, required for the `alerts` commands
 [indexer]
 url      = "https://wazuh-indexer:9200"
-username = "admin"
-password = "admin"
+username = "kibanaserver"
+password = "kibanaserver"
 ```
 
-> **Note:** The `[auth]` credentials are Wazuh Manager API users (port 55000), not the Dashboard/Indexer login.  
-> To retrieve or reset them on the manager: `curl -k -u wazuh:wazuh -X POST "https://localhost:55000/security/user/authenticate?raw=true"`
+> The `[auth]` credentials are Wazuh Manager API users (port 55000), not the Dashboard/Indexer login.
+> To test them: `curl -k -u wazuh:wazuh -X POST "https://localhost:55000/security/user/authenticate?raw=true"`
 
 ---
 
@@ -183,7 +184,7 @@ TIMESTAMP                    LVL  AGENT       RULE   DESCRIPTION
 
 ### JSON output
 
-Every command supports `--output json` for piping or scripting:
+All commands support `--output json` for piping or scripting:
 
 ```bash
 wazuh-cli agent list --output json | jq '.[] | select(.status == "disconnected")'
@@ -204,7 +205,7 @@ wazuh-cli vuln list 001 --severity critical --output json | jq '.[].cve'
 | `vuln` | `list`, `summary` |
 | `cluster` | `status`, `nodes`, `health` |
 | `alerts` | `list`, `search` |
-| `config` | _(show active config)_ |
+| `config` | show active config |
 
 ---
 
