@@ -172,7 +172,7 @@ type Rule struct {
 	Description string   `json:"description"`
 	Groups      []string `json:"groups"`
 	Filename    string   `json:"filename"`
-	Relative    bool     `json:"relative_dirname"`
+	Relative    string   `json:"relative_dirname"`
 	Status      string   `json:"status"`
 }
 
