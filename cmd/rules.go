@@ -39,7 +39,7 @@ func newRulesCmd() *cobra.Command {
 			t := output.NewTable("ID", "LEVEL", "GROUPS", "DESCRIPTION")
 			for _, rule := range rules {
 				t.Row(fmt.Sprintf("%d", rule.ID), output.ColorLevel(rule.Level),
-					strings.Join(rule.Groups, ","), rule.Description)
+					strings.Join(rule.Groups, ","), output.Truncate(rule.Description, 60))
 			}
 			t.Flush()
 		},

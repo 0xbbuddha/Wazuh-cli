@@ -4,8 +4,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"regexp"
 	"strings"
-	"text/tabwriter"
+	"unicode/utf8"
 
 	"github.com/fatih/color"
 )
@@ -13,13 +14,34 @@ import (
 var Format = "table"
 
 var (
-	header   = color.New(color.FgCyan, color.Bold)
-	bold     = color.New(color.Bold)
-	green    = color.New(color.FgGreen)
-	yellow   = color.New(color.FgYellow)
-	red      = color.New(color.FgRed)
-	faint    = color.New(color.Faint)
+	headerStyle = color.New(color.FgCyan, color.Bold)
+	bold        = color.New(color.Bold)
+	green       = color.New(color.FgGreen)
+	yellow      = color.New(color.FgYellow)
+	red         = color.New(color.FgRed)
+	faint       = color.New(color.Faint)
+
+	ansiRe = regexp.MustCompile(`\x1b\[[0-9;]*m`)
 )
+
+// visibleLen returns the printable width of a string, ignoring ANSI escape codes.
+func visibleLen(s string) int {
+	return utf8.RuneCountInString(ansiRe.ReplaceAllString(s, ""))
+}
+
+// truncate cuts s to maxLen visible characters, appending "..." if needed.
+func truncate(s string, maxLen int) string {
+	if visibleLen(s) <= maxLen {
+		return s
+	}
+	// strip ANSI before truncating to avoid cutting inside an escape sequence
+	plain := ansiRe.ReplaceAllString(s, "")
+	runes := []rune(plain)
+	if maxLen <= 3 {
+		return string(runes[:maxLen])
+	}
+	return string(runes[:maxLen-3]) + "..."
+}
 
 func JSON(v any) {
 	enc := json.NewEncoder(os.Stdout)
@@ -29,58 +51,84 @@ func JSON(v any) {
 	}
 }
 
-func NewTable(headers ...string) *Table {
-	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
-	t := &Table{w: w, first: true}
-	t.Row(headers...)
-	return t
+// Table buffers all rows, calculates column widths based on visible characters,
+// then flushes with correct padding — ANSI codes do not affect alignment.
+type Table struct {
+	headers []string
+	rows    [][]string
+	maxCols []int // max visible width per column
 }
 
-type Table struct {
-	w     *tabwriter.Writer
-	first bool
+func NewTable(headers ...string) *Table {
+	widths := make([]int, len(headers))
+	for i, h := range headers {
+		widths[i] = visibleLen(h)
+	}
+	return &Table{headers: headers, maxCols: widths}
 }
 
 func (t *Table) Row(cols ...string) {
+	// Grow maxCols if necessary.
+	for len(t.maxCols) < len(cols) {
+		t.maxCols = append(t.maxCols, 0)
+	}
+	row := make([]string, len(cols))
 	for i, c := range cols {
-		if i > 0 {
-			fmt.Fprint(t.w, "\t")
-		}
-		if t.first {
-			fmt.Fprint(t.w, header.Sprint(c))
-		} else {
-			fmt.Fprint(t.w, c)
+		row[i] = c
+		if w := visibleLen(c); w > t.maxCols[i] {
+			t.maxCols[i] = w
 		}
 	}
-	fmt.Fprintln(t.w)
-	t.first = false
+	t.rows = append(t.rows, row)
 }
 
+const colPad = 2 // spaces between columns
+
 func (t *Table) Flush() {
-	t.w.Flush()
+	printRow := func(cols []string, isHeader bool) {
+		for i, c := range cols {
+			if isHeader {
+				c = headerStyle.Sprint(c)
+			}
+			vl := visibleLen(c)
+			width := t.maxCols[i]
+			padding := width - vl
+			if i < len(cols)-1 {
+				padding += colPad
+			}
+			fmt.Print(c + strings.Repeat(" ", padding))
+		}
+		fmt.Println()
+	}
+
+	printRow(t.headers, true)
+	for _, row := range t.rows {
+		printRow(row, false)
+	}
 }
 
 func Field(key, value string) {
 	fmt.Printf("%-20s %s\n", bold.Sprint(key+":"), value)
 }
 
-// ColorStatus colors an agent connection status.
+// Truncate is exported so commands can trim long fields before passing to Row.
+func Truncate(s string, max int) string {
+	return truncate(s, max)
+}
+
 func ColorStatus(s string) string {
 	switch strings.ToLower(s) {
 	case "active":
 		return green.Sprint(s)
 	case "disconnected":
 		return red.Sprint(s)
-	case "never_connected":
-		return yellow.Sprint(s)
-	case "pending":
+	case "never_connected", "pending":
 		return yellow.Sprint(s)
 	default:
 		return faint.Sprint(s)
 	}
 }
 
-// ColorLevel colors a rule/alert level (1-15).
 func ColorLevel(level int) string {
 	s := fmt.Sprintf("%d", level)
 	switch {
@@ -95,7 +143,6 @@ func ColorLevel(level int) string {
 	}
 }
 
-// ColorSeverity colors a vulnerability severity string.
 func ColorSeverity(s string) string {
 	switch strings.ToLower(s) {
 	case "critical":
@@ -111,7 +158,6 @@ func ColorSeverity(s string) string {
 	}
 }
 
-// ColorResult colors a SCA check result.
 func ColorResult(s string) string {
 	switch strings.ToLower(s) {
 	case "passed":
@@ -125,7 +171,6 @@ func ColorResult(s string) string {
 	}
 }
 
-// ColorDaemon colors a daemon status.
 func ColorDaemon(s string) string {
 	switch strings.ToLower(s) {
 	case "running":

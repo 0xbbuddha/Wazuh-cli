@@ -101,7 +101,7 @@ func printAlerts(limit, level int, agentID string) {
 			output.ColorLevel(a.Rule.Level),
 			a.Agent.Name,
 			a.Rule.ID,
-			a.Rule.Description)
+			output.Truncate(a.Rule.Description, 60))
 	}
 	t.Flush()
 }

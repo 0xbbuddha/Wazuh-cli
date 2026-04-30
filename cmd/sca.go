@@ -31,7 +31,7 @@ func newSCACmd() *cobra.Command {
 			}
 			t := output.NewTable("POLICY", "NAME", "PASS", "FAIL", "INVALID", "SCORE%", "LAST SCAN")
 			for _, p := range policies {
-				t.Row(p.PolicyID, p.Name,
+				t.Row(p.PolicyID, output.Truncate(p.Name, 50),
 					fmt.Sprintf("%d", p.PassCount),
 					fmt.Sprintf("%d", p.FailCount),
 					fmt.Sprintf("%d", p.InvalidCount),
@@ -59,7 +59,7 @@ func newSCACmd() *cobra.Command {
 			fmt.Printf("Showing %d of %d checks\n\n", len(checks), total)
 			t := output.NewTable("ID", "RESULT", "TITLE")
 			for _, ch := range checks {
-				t.Row(fmt.Sprintf("%d", ch.ID), output.ColorResult(ch.Result), ch.Title)
+				t.Row(fmt.Sprintf("%d", ch.ID), output.ColorResult(ch.Result), output.Truncate(ch.Title, 60))
 			}
 			t.Flush()
 		},
