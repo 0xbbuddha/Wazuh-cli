@@ -2,7 +2,9 @@ package cmd
 
 import (
 	"fmt"
+	"strings"
 
+	"github.com/fatih/color"
 	"github.com/spf13/cobra"
 
 	"github.com/0xbbuddha/wazuh-cli/internal/api"
@@ -11,8 +13,8 @@ import (
 
 func newVulnCmd() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "vuln",
-		Short: "Vulnerability detection results",
+		Use:     "vuln",
+		Short:   "Vulnerability detection results",
 		Aliases: []string{"v"},
 	}
 
@@ -28,7 +30,17 @@ func newVulnCmd() *cobra.Command {
 			v := api.NewVulnAPI(managerClient)
 			vulns, total, err := v.List(args[0], severity, limit)
 			if err != nil {
-				die(err)
+				if !isVulnNotFound(err) {
+					die(err)
+				}
+				// Wazuh 4.8+ stores vulnerabilities in the indexer, not the manager.
+				if indexerClient == nil {
+					fmt.Println(color.YellowString("note:") + " vulnerability data is not available via the manager API (Wazuh 4.8+).")
+					fmt.Println("Configure [indexer] in config.toml to query vulnerabilities from the indexer.")
+					return
+				}
+				listVulnsFromIndexer(args[0], severity, limit)
+				return
 			}
 			if output.Format == "json" {
 				output.JSON(vulns)
@@ -50,14 +62,24 @@ func newVulnCmd() *cobra.Command {
 	listCmd.Flags().IntVar(&limit, "limit", 500, "Maximum number of results")
 	cmd.AddCommand(listCmd)
 
-	cmd.AddCommand(&cobra.Command{
+	var sumLimit int
+	summaryCmd := &cobra.Command{
 		Use:   "summary <agent_id>",
-		Short: "Show vulnerability summary grouped by severity",
+		Short: "Show vulnerability counts grouped by severity",
 		Args:  cobra.ExactArgs(1),
 		Run: func(cmd *cobra.Command, args []string) {
+			// Always use indexer for summary on Wazuh 4.8+ since manager API is unreliable.
+			if indexerClient != nil {
+				summarizeVulnsFromIndexer(args[0], sumLimit)
+				return
+			}
 			v := api.NewVulnAPI(managerClient)
 			summary, err := v.Summary(args[0], "severity")
 			if err != nil {
+				if isVulnNotFound(err) {
+					fmt.Println(color.YellowString("note:") + " configure [indexer] in config.toml to query vulnerabilities from the indexer (Wazuh 4.8+).")
+					return
+				}
 				die(err)
 			}
 			if output.Format == "json" {
@@ -68,7 +90,59 @@ func newVulnCmd() *cobra.Command {
 				fmt.Printf("%-12s %s\n", k+":", output.ColorSeverity(fmt.Sprintf("%v", val)))
 			}
 		},
-	})
+	}
+	summaryCmd.Flags().IntVar(&sumLimit, "limit", 5000, "Max vulnerabilities to aggregate")
+	cmd.AddCommand(summaryCmd)
 
 	return cmd
+}
+
+func listVulnsFromIndexer(agentID, severity string, limit int) {
+	vulns, total, err := indexerClient.Vulnerabilities(agentID, severity, limit)
+	if err != nil {
+		die(err)
+	}
+	if output.Format == "json" {
+		output.JSON(vulns)
+		return
+	}
+	fmt.Printf("Showing %d of %d vulnerabilities (via indexer)\n\n", len(vulns), total)
+	t := output.NewTable("CVE", "SEVERITY", "SCORE", "PACKAGE", "VERSION")
+	for _, vv := range vulns {
+		t.Row(
+			vv.Vuln.ID,
+			output.ColorSeverity(vv.Vuln.Severity),
+			fmt.Sprintf("%.1f", vv.Vuln.Score.Base),
+			vv.Package.Name,
+			vv.Package.Version,
+		)
+	}
+	t.Flush()
+}
+
+func summarizeVulnsFromIndexer(agentID string, limit int) {
+	vulns, total, err := indexerClient.Vulnerabilities(agentID, "", limit)
+	if err != nil {
+		die(err)
+	}
+	counts := map[string]int{"critical": 0, "high": 0, "medium": 0, "low": 0, "none": 0}
+	for _, v := range vulns {
+		sev := strings.ToLower(v.Vuln.Severity)
+		if _, ok := counts[sev]; ok {
+			counts[sev]++
+		}
+	}
+	if output.Format == "json" {
+		output.JSON(map[string]any{"total": total, "by_severity": counts})
+		return
+	}
+	fmt.Printf("Total: %d vulnerabilities\n\n", total)
+	for _, sev := range []string{"critical", "high", "medium", "low", "none"} {
+		fmt.Printf("%-12s %s\n", sev+":", output.ColorSeverity(fmt.Sprintf("%d", counts[sev])))
+	}
+}
+
+func isVulnNotFound(err error) bool {
+	msg := err.Error()
+	return strings.Contains(msg, "404") || strings.Contains(msg, "Not Found")
 }

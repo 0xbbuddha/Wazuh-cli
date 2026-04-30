@@ -197,6 +197,98 @@ func (ic *IndexerClient) ClusterHealth() (*IndexerClusterHealth, error) {
 	return &h, nil
 }
 
+// IndexerVulnerability is a vulnerability entry from wazuh-states-vulnerabilities-* (Wazuh 4.8+).
+type IndexerVulnerability struct {
+	Agent   VulnAgent   `json:"agent"`
+	Vuln    VulnDetail  `json:"vulnerability"`
+	Package VulnPackage `json:"package"`
+}
+
+type VulnAgent struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
+}
+
+type VulnDetail struct {
+	ID          string `json:"id"`
+	Severity    string `json:"severity"`
+	Description string `json:"description"`
+	Published   string `json:"published_date"`
+	Score       VulnScore `json:"score"`
+}
+
+type VulnScore struct {
+	Base float64 `json:"base"`
+}
+
+type VulnPackage struct {
+	Name         string `json:"name"`
+	Version      string `json:"version"`
+	Architecture string `json:"architecture"`
+}
+
+type vulnHitsResponse struct {
+	Hits struct {
+		Total struct {
+			Value int `json:"value"`
+		} `json:"total"`
+		Items []struct {
+			Source IndexerVulnerability `json:"_source"`
+		} `json:"hits"`
+	} `json:"hits"`
+}
+
+// Vulnerabilities queries wazuh-states-vulnerabilities-* for a given agent (Wazuh 4.8+).
+func (ic *IndexerClient) Vulnerabilities(agentID, severity string, limit int) ([]IndexerVulnerability, int, error) {
+	must := []map[string]any{
+		{"term": map[string]any{"agent.id": agentID}},
+	}
+	if severity != "" {
+		must = append(must, map[string]any{
+			"term": map[string]any{"vulnerability.severity": severity},
+		})
+	}
+
+	body, err := json.Marshal(map[string]any{
+		"query": map[string]any{"bool": map[string]any{"must": must}},
+		"sort":  []map[string]any{{"vulnerability.score.base": map[string]any{"order": "desc"}}},
+		"size":  limit,
+	})
+	if err != nil {
+		return nil, 0, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost,
+		ic.baseURL+"/wazuh-states-vulnerabilities-*/_search", bytes.NewReader(body))
+	if err != nil {
+		return nil, 0, err
+	}
+	req.SetBasicAuth(ic.username, ic.password)
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := ic.httpClient.Do(req)
+	if err != nil {
+		return nil, 0, fmt.Errorf("indexer request failed: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		b, _ := io.ReadAll(resp.Body)
+		return nil, 0, fmt.Errorf("indexer HTTP %d: %s", resp.StatusCode, b)
+	}
+
+	var result vulnHitsResponse
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return nil, 0, err
+	}
+
+	vulns := make([]IndexerVulnerability, len(result.Hits.Items))
+	for i, h := range result.Hits.Items {
+		vulns[i] = h.Source
+	}
+	return vulns, result.Hits.Total.Value, nil
+}
+
 // Search performs a full-text search across alert logs and descriptions.
 func (ic *IndexerClient) Search(queryStr string, limit int) ([]Alert, int, error) {
 	query := AlertsQuery{
