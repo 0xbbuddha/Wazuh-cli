@@ -156,6 +156,47 @@ func (ic *IndexerClient) Alerts(limit, minLevel int, agentID string) ([]Alert, i
 	return alerts, result.Hits.Total.Value, nil
 }
 
+// IndexerClusterHealth holds OpenSearch cluster health data.
+type IndexerClusterHealth struct {
+	ClusterName            string  `json:"cluster_name"`
+	Status                 string  `json:"status"`
+	TimedOut               bool    `json:"timed_out"`
+	NumberOfNodes          int     `json:"number_of_nodes"`
+	NumberOfDataNodes      int     `json:"number_of_data_nodes"`
+	ActivePrimaryShards    int     `json:"active_primary_shards"`
+	ActiveShards           int     `json:"active_shards"`
+	RelocatingShards       int     `json:"relocating_shards"`
+	InitializingShards     int     `json:"initializing_shards"`
+	UnassignedShards       int     `json:"unassigned_shards"`
+	ActiveShardsPercent    float64 `json:"active_shards_percent_as_number"`
+}
+
+// ClusterHealth queries the OpenSearch /_cluster/health endpoint.
+func (ic *IndexerClient) ClusterHealth() (*IndexerClusterHealth, error) {
+	req, err := http.NewRequest(http.MethodGet, ic.baseURL+"/_cluster/health", nil)
+	if err != nil {
+		return nil, err
+	}
+	req.SetBasicAuth(ic.username, ic.password)
+
+	resp, err := ic.httpClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("indexer request failed: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		b, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("indexer HTTP %d: %s", resp.StatusCode, b)
+	}
+
+	var h IndexerClusterHealth
+	if err := json.NewDecoder(resp.Body).Decode(&h); err != nil {
+		return nil, err
+	}
+	return &h, nil
+}
+
 // Search performs a full-text search across alert logs and descriptions.
 func (ic *IndexerClient) Search(queryStr string, limit int) ([]Alert, int, error) {
 	query := AlertsQuery{
