@@ -1,7 +1,6 @@
 package api
 
 import (
-	"encoding/json"
 	"fmt"
 	"net/url"
 
@@ -76,22 +75,8 @@ type GroupsData struct {
 type Group struct {
 	Name   string `json:"name"`
 	Count  int    `json:"count"`
-	Config GroupConfig `json:"configSum"`
-	Merged GroupConfig `json:"mergedSum"`
-}
-
-type GroupConfig struct {
-	Sum string `json:"-"`
-}
-
-func (g *Group) UnmarshalJSON(data []byte) error {
-	type Alias Group
-	aux := &struct {
-		*Alias
-	}{
-		Alias: (*Alias)(g),
-	}
-	return json.Unmarshal(data, aux)
+	Config string `json:"configSum"`
+	Merged string `json:"mergedSum"`
 }
 
 func (a *AgentsAPI) Groups() ([]Group, error) {

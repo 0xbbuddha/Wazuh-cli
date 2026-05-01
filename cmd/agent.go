@@ -114,6 +114,10 @@ func newAgentCmd() *cobra.Command {
 			output.Field("  Never connected", fmt.Sprintf("%d", s.Connection.NeverConnected))
 			output.Field("  Pending", fmt.Sprintf("%d", s.Connection.Pending))
 			output.Field("  Total", fmt.Sprintf("%d", s.Connection.Total))
+			fmt.Println("Configuration sync:")
+			output.Field("  Synced", fmt.Sprintf("%d", s.Config.Synced))
+			output.Field("  Not synced", fmt.Sprintf("%d", s.Config.NotSynced))
+			output.Field("  Total", fmt.Sprintf("%d", s.Config.Total))
 		},
 	}
 

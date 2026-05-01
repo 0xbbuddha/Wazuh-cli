@@ -15,28 +15,19 @@ func NewSyscollectorAPI(c *client.Client) *SyscollectorAPI {
 	return &SyscollectorAPI{c: c}
 }
 
-type hardwareResponse struct {
-	Data    HardwareInfo `json:"data"`
-	Message string       `json:"message"`
-	Error   int          `json:"error"`
-}
-
 func (s *SyscollectorAPI) Hardware(agentID string) (*HardwareInfo, error) {
-	var resp hardwareResponse
+	var resp APIResponse[HardwareInfo]
 	if err := s.c.Get(fmt.Sprintf("/syscollector/%s/hardware", agentID), &resp); err != nil {
 		return nil, err
 	}
-	return &resp.Data, nil
-}
-
-type osResponse struct {
-	Data    APIData[OSInfo] `json:"data"`
-	Message string          `json:"message"`
-	Error   int             `json:"error"`
+	if len(resp.Data.AffectedItems) == 0 {
+		return nil, fmt.Errorf("no hardware info for agent %s", agentID)
+	}
+	return &resp.Data.AffectedItems[0], nil
 }
 
 func (s *SyscollectorAPI) OS(agentID string) (*OSInfo, error) {
-	var resp osResponse
+	var resp APIResponse[OSInfo]
 	if err := s.c.Get(fmt.Sprintf("/syscollector/%s/os", agentID), &resp); err != nil {
 		return nil, err
 	}

@@ -15,32 +15,27 @@ func NewManagerAPI(c *client.Client) *ManagerAPI {
 	return &ManagerAPI{c: c}
 }
 
-type managerInfoResponse struct {
-	Data    ManagerInfo `json:"data"`
-	Message string      `json:"message"`
-	Error   int         `json:"error"`
-}
-
 func (m *ManagerAPI) Info() (*ManagerInfo, error) {
-	var resp managerInfoResponse
+	var resp APIResponse[ManagerInfo]
 	if err := m.c.Get("/manager/info", &resp); err != nil {
 		return nil, err
 	}
-	return &resp.Data, nil
-}
-
-type managerStatusResponse struct {
-	Data    map[string]string `json:"data"`
-	Message string            `json:"message"`
-	Error   int               `json:"error"`
+	if len(resp.Data.AffectedItems) == 0 {
+		return nil, fmt.Errorf("no info returned by manager")
+	}
+	return &resp.Data.AffectedItems[0], nil
 }
 
 func (m *ManagerAPI) Status() (map[string]string, error) {
-	var resp managerStatusResponse
+	// The API returns affected_items[0] as a flat map of daemon → status.
+	var resp APIResponse[map[string]string]
 	if err := m.c.Get("/manager/status", &resp); err != nil {
 		return nil, err
 	}
-	return resp.Data, nil
+	if len(resp.Data.AffectedItems) == 0 {
+		return nil, fmt.Errorf("no status returned by manager")
+	}
+	return resp.Data.AffectedItems[0], nil
 }
 
 func (m *ManagerAPI) Logs(lines int) ([]ManagerLog, error) {

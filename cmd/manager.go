@@ -31,10 +31,9 @@ func newManagerCmd() *cobra.Command {
 				output.JSON(info)
 				return
 			}
-			output.Field("Name", info.Name)
 			output.Field("Version", info.Version)
 			output.Field("Type", info.Type)
-			output.Field("Ruleset", info.RulesetsPath)
+			output.Field("Path", info.Path)
 			output.Field("Compiled", info.Compilation)
 			output.Field("Max agents", info.MaxAgents)
 			output.Field("OpenSSL", info.OpenSSL)

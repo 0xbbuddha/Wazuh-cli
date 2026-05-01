@@ -61,11 +61,12 @@ func newSyscollectorCmd() *cobra.Command {
 				return
 			}
 			output.Field("Hostname", info.Hostname)
-			output.Field("OS Name", info.Name)
-			output.Field("Version", info.Version)
-			output.Field("Platform", info.Platform)
+			output.Field("OS Name", info.Os.Name)
+			output.Field("Version", info.Os.Version)
+			output.Field("Platform", info.Os.Platform)
+			output.Field("Codename", info.Os.Codename)
 			output.Field("Architecture", info.Architecture)
-			output.Field("Kernel", info.Kernel)
+			output.Field("Kernel", info.Release)
 		},
 	})
 
@@ -147,8 +148,8 @@ func newSyscollectorCmd() *cobra.Command {
 			fmt.Printf("Showing %d of %d processes\n\n", len(procs), total)
 			t := output.NewTable("PID", "PPID", "USER", "STATE", "NAME", "CMD")
 			for _, p := range procs {
-				t.Row(fmt.Sprintf("%d", p.PID), fmt.Sprintf("%d", p.PPID),
-					p.Euser, p.State, p.Name, p.Cmd)
+				t.Row(p.PID, fmt.Sprintf("%d", p.PPID),
+					p.Euser, p.State, p.Name, output.Truncate(p.Cmd, 40))
 			}
 			t.Flush()
 		},

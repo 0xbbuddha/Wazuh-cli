@@ -85,10 +85,11 @@ func newClusterCmd() *cobra.Command {
 				output.JSON(h)
 				return
 			}
-			fmt.Printf("%d nodes in cluster\n\n", len(h.Nodes))
+
+			fmt.Printf("%d nodes in cluster\n\n", len(h))
 			t := output.NewTable("NODE", "TYPE", "IP", "VERSION")
-			for name, n := range h.Nodes {
-				t.Row(name, n.Info.Type, n.Info.IP, n.Info.Version)
+			for _, n := range h {
+				t.Row(n.Info.Name, n.Info.Type, n.Info.IP, n.Info.Version)
 			}
 			t.Flush()
 		},

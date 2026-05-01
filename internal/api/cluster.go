@@ -34,24 +34,22 @@ func (cl *ClusterAPI) Nodes() ([]ClusterNode, error) {
 	return resp.Data.AffectedItems, nil
 }
 
-type ClusterHealth struct {
-	Nodes map[string]ClusterNodeHealth `json:"nodes"`
-}
-
+// ClusterNodeHealth is returned by GET /cluster/healthcheck as an array in affected_items.
 type ClusterNodeHealth struct {
-	Info ClusterNode `json:"info"`
+	Info   ClusterNode       `json:"info"`
+	Status ClusterNodeStatus `json:"status"`
 }
 
-type clusterHealthResponse struct {
-	Data    ClusterHealth `json:"data"`
-	Message string        `json:"message"`
-	Error   int           `json:"error"`
+type ClusterNodeStatus struct {
+	SyncIntegrity   string `json:"sync_integrity_free"`
+	SyncAgentInfo   string `json:"sync_agent_info_free"`
+	SyncAgentGroups string `json:"sync_agent_groups_free"`
 }
 
-func (cl *ClusterAPI) Health() (*ClusterHealth, error) {
-	var resp clusterHealthResponse
+func (cl *ClusterAPI) Health() ([]ClusterNodeHealth, error) {
+	var resp APIResponse[ClusterNodeHealth]
 	if err := cl.c.Get("/cluster/healthcheck", &resp); err != nil {
 		return nil, err
 	}
-	return &resp.Data, nil
+	return resp.Data.AffectedItems, nil
 }

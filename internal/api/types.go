@@ -16,17 +16,17 @@ type APIData[T any] struct {
 // --- Agent types ---
 
 type Agent struct {
-	ID            string    `json:"id"`
-	Name          string    `json:"name"`
-	IP            string    `json:"ip"`
-	Status        string    `json:"status"`
-	Version       string    `json:"version"`
-	Manager       string    `json:"manager"`
-	NodeName      string    `json:"node_name"`
-	DateAdd       string    `json:"dateAdd"`
-	LastKeepAlive string    `json:"lastKeepAlive"`
-	Group         []string  `json:"group"`
-	Os            AgentOS   `json:"os"`
+	ID            string   `json:"id"`
+	Name          string   `json:"name"`
+	IP            string   `json:"ip"`
+	Status        string   `json:"status"`
+	Version       string   `json:"version"`
+	Manager       string   `json:"manager"`
+	NodeName      string   `json:"node_name"`
+	DateAdd       string   `json:"dateAdd"`
+	LastKeepAlive string   `json:"lastKeepAlive"`
+	Group         []string `json:"group"`
+	Os            AgentOS  `json:"os"`
 }
 
 type AgentOS struct {
@@ -37,54 +37,39 @@ type AgentOS struct {
 }
 
 type AgentSummary struct {
-	Connection AgentStatusCount `json:"connection"`
-	Config     AgentStatusCount `json:"configuration"`
+	Connection AgentStatusCount  `json:"connection"`
+	Config     AgentConfigStatus `json:"configuration"`
 }
 
 type AgentStatusCount struct {
-	Active        int `json:"active"`
-	Disconnected  int `json:"disconnected"`
+	Active         int `json:"active"`
+	Disconnected   int `json:"disconnected"`
 	NeverConnected int `json:"never_connected"`
-	Pending       int `json:"pending"`
-	Total         int `json:"total"`
+	Pending        int `json:"pending"`
+	Total          int `json:"total"`
+}
+
+type AgentConfigStatus struct {
+	Synced    int `json:"synced"`
+	NotSynced int `json:"not_synced"`
+	Total     int `json:"total"`
 }
 
 // --- Manager types ---
 
 type ManagerInfo struct {
-	Compilation   string `json:"compilation_date"`
-	Version       string `json:"version"`
-	OpenSSL       string `json:"openssl_support"`
-	MaxAgents     string `json:"max_agents"`
-	RulesetsPath  string `json:"ruleset_version"`
-	Type          string `json:"type"`
-	Name          string `json:"name"`
-}
-
-type ManagerDaemon struct {
-	Status string `json:"status"`
-}
-
-type ManagerStatus struct {
-	AgentlessDaemon  ManagerDaemon `json:"wazuh-agentlessd"`
-	AnalysisDaemon   ManagerDaemon `json:"wazuh-analysisd"`
-	AuthDaemon       ManagerDaemon `json:"wazuh-authd"`
-	ClusterDaemon    ManagerDaemon `json:"wazuh-clusterd"`
-	ExecDaemon       ManagerDaemon `json:"wazuh-execd"`
-	IntegrationDaemon ManagerDaemon `json:"wazuh-integratord"`
-	LogCollector     ManagerDaemon `json:"wazuh-logcollector"`
-	MailDaemon       ManagerDaemon `json:"wazuh-maild"`
-	ModulesDaemon    ManagerDaemon `json:"wazuh-modulesd"`
-	MonitorDaemon    ManagerDaemon `json:"wazuh-monitord"`
-	RemoteDaemon     ManagerDaemon `json:"wazuh-remoted"`
-	ReportDaemon     ManagerDaemon `json:"wazuh-reportd"`
-	SysCheckDaemon   ManagerDaemon `json:"wazuh-syscheckd"`
+	Compilation string `json:"compilation_date"`
+	Version     string `json:"version"`
+	OpenSSL     string `json:"openssl_support"`
+	MaxAgents   string `json:"max_agents"`
+	Type        string `json:"type"`
+	Path        string `json:"path"`
 }
 
 type ManagerLog struct {
-	Timestamp string `json:"timestamp"`
-	Tag       string `json:"tag"`
-	Level     string `json:"level"`
+	Timestamp   string `json:"timestamp"`
+	Tag         string `json:"tag"`
+	Level       string `json:"level"`
 	Description string `json:"description"`
 }
 
@@ -113,23 +98,31 @@ type HardwareScan struct {
 	Time string `json:"time"`
 }
 
+// OSInfo matches the nested structure returned by GET /syscollector/{id}/os.
 type OSInfo struct {
-	Name         string `json:"os_name"`
-	Version      string `json:"os_version"`
-	Platform     string `json:"os_platform"`
-	Architecture string `json:"architecture"`
-	Hostname     string `json:"hostname"`
-	Kernel       string `json:"os_release"`
+	Os            OSDetails `json:"os"`
+	Architecture  string    `json:"architecture"`
+	Hostname      string    `json:"hostname"`
+	Release       string    `json:"release"`
+	Sysname       string    `json:"sysname"`
+	KernelVersion string    `json:"version"`
+}
+
+type OSDetails struct {
+	Name     string `json:"name"`
+	Version  string `json:"version"`
+	Platform string `json:"platform"`
+	Codename string `json:"codename"`
 }
 
 type Package struct {
-	Name        string `json:"name"`
-	Version     string `json:"version"`
+	Name         string `json:"name"`
+	Version      string `json:"version"`
 	Architecture string `json:"architecture"`
-	Source      string `json:"source"`
-	Description string `json:"description"`
-	Vendor      string `json:"vendor"`
-	Format      string `json:"format"`
+	Source       string `json:"source"`
+	Description  string `json:"description"`
+	Vendor       string `json:"vendor"`
+	Format       string `json:"format"`
 }
 
 type NetworkAddress struct {
@@ -154,14 +147,14 @@ type PortLocal struct {
 }
 
 type Process struct {
-	PID     int    `json:"pid"`
-	Name    string `json:"name"`
-	State   string `json:"state"`
-	Euser   string `json:"euser"`
-	Cmd     string `json:"cmd"`
-	PPID    int    `json:"ppid"`
-	VMSize  int    `json:"vm_size"`
-	NLWP    int    `json:"nlwp"`
+	PID    string `json:"pid"` // API returns pid as string
+	Name   string `json:"name"`
+	State  string `json:"state"`
+	Euser  string `json:"euser"`
+	Cmd    string `json:"cmd"`
+	PPID   int    `json:"ppid"`
+	VMSize int    `json:"vm_size"`
+	NLWP   int    `json:"nlwp"`
 }
 
 // --- Rules types ---
@@ -179,15 +172,16 @@ type Rule struct {
 // --- SCA types ---
 
 type SCAPolicy struct {
-	PolicyID    string `json:"policy_id"`
-	Name        string `json:"name"`
-	Description string `json:"description"`
-	PassCount   int    `json:"pass"`
-	FailCount   int    `json:"fail"`
-	InvalidCount int   `json:"invalid"`
-	TotalChecks int    `json:"total_checks"`
-	Score       int    `json:"score"`
-	EndScan     string `json:"end_scan"`
+	PolicyID     string `json:"policy_id"`
+	Name         string `json:"name"`
+	Description  string `json:"description"`
+	PassCount    int    `json:"pass"`
+	FailCount    int    `json:"fail"`
+	InvalidCount int    `json:"invalid"`
+	TotalChecks  int    `json:"total_checks"`
+	Score        int    `json:"score"`
+	StartScan    string `json:"start_scan"`
+	EndScan      string `json:"end_scan"`
 }
 
 type SCACheck struct {
@@ -202,21 +196,21 @@ type SCACheck struct {
 // --- Vulnerability types ---
 
 type Vulnerability struct {
-	CVE         string `json:"cve"`
-	Name        string `json:"name"`
-	Version     string `json:"version"`
+	CVE          string `json:"cve"`
+	Name         string `json:"name"`
+	Version      string `json:"version"`
 	Architecture string `json:"architecture"`
-	Severity    string `json:"severity"`
-	Published   string `json:"published"`
-	Title       string `json:"title"`
-	Type        string `json:"type"`
+	Severity     string `json:"severity"`
+	Published    string `json:"published"`
+	Title        string `json:"title"`
+	Type         string `json:"type"`
 }
 
 // --- Cluster types ---
 
 type ClusterStatus struct {
-	Enabled  string `json:"enabled"`
-	Running  string `json:"running"`
+	Enabled string `json:"enabled"`
+	Running string `json:"running"`
 }
 
 type ClusterNode struct {
