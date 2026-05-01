@@ -53,7 +53,7 @@ func newVulnCmd() *cobra.Command {
 				if len(title) > 60 {
 					title = title[:57] + "..."
 				}
-				t.Row(vv.CVE, output.ColorSeverity(vv.Severity), vv.Name, vv.Version, title)
+				t.Row(vv.CVE, output.SeverityBadge(vv.Severity), vv.Name, vv.Version, title)
 			}
 			t.Flush()
 		},
@@ -111,7 +111,7 @@ func listVulnsFromIndexer(agentID, severity string, limit int) {
 	for _, vv := range vulns {
 		t.Row(
 			vv.Vuln.ID,
-			output.ColorSeverity(vv.Vuln.Severity),
+			output.SeverityBadge(vv.Vuln.Severity),
 			fmt.Sprintf("%.1f", vv.Vuln.Score.Base),
 			vv.Package.Name,
 			vv.Package.Version,

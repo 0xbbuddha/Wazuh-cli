@@ -181,3 +181,66 @@ func ColorDaemon(s string) string {
 		return yellow.Sprint(s)
 	}
 }
+
+// ProgressBar renders a colored filled/empty bar for a 0-100 score.
+// Example: [████████████░░░░░░░░] 60%
+func ProgressBar(score int) string {
+	const width = 20
+	filled := (score * width) / 100
+	if filled > width {
+		filled = width
+	}
+	bar := strings.Repeat("█", filled) + strings.Repeat("░", width-filled)
+	var c *color.Color
+	switch {
+	case score >= 80:
+		c = green
+	case score >= 60:
+		c = yellow
+	default:
+		c = red
+	}
+	return fmt.Sprintf("[%s] %3d%%", c.Sprint(bar), score)
+}
+
+// Sparkline maps a slice of integers to unicode block characters (▁▂▃▄▅▆▇█).
+func Sparkline(values []int) string {
+	bars := []rune{' ', '▁', '▂', '▃', '▄', '▅', '▆', '▇', '█'}
+	if len(values) == 0 {
+		return ""
+	}
+	maxVal := 0
+	for _, v := range values {
+		if v > maxVal {
+			maxVal = v
+		}
+	}
+	var sb strings.Builder
+	for _, v := range values {
+		idx := 0
+		if maxVal > 0 {
+			idx = int(float64(v) / float64(maxVal) * float64(len(bars)-1))
+		}
+		sb.WriteRune(bars[idx])
+	}
+	return sb.String()
+}
+
+// SeverityBadge renders a colored severity badge like [CRITICAL] or [HIGH].
+func SeverityBadge(s string) string {
+	switch strings.ToLower(s) {
+	case "critical":
+		return color.New(color.FgRed, color.Bold).Sprint("[CRITICAL]")
+	case "high":
+		return color.New(color.FgRed).Sprint("[HIGH]")
+	case "medium":
+		return color.New(color.FgYellow).Sprint("[MEDIUM]")
+	case "low":
+		return color.New(color.FgGreen).Sprint("[LOW]")
+	default:
+		if s == "" {
+			return faint.Sprint("[NONE]")
+		}
+		return faint.Sprint("[" + strings.ToUpper(s) + "]")
+	}
+}

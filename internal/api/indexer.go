@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 	"time"
 )
 
@@ -244,8 +245,10 @@ func (ic *IndexerClient) Vulnerabilities(agentID, severity string, limit int) ([
 		{"term": map[string]any{"agent.id": agentID}},
 	}
 	if severity != "" {
+		// Indexer stores severity in title case ("Critical", not "critical").
+		normalized := strings.ToUpper(severity[:1]) + strings.ToLower(severity[1:])
 		must = append(must, map[string]any{
-			"term": map[string]any{"vulnerability.severity": severity},
+			"term": map[string]any{"vulnerability.severity": normalized},
 		})
 	}
 
@@ -287,6 +290,136 @@ func (ic *IndexerClient) Vulnerabilities(agentID, severity string, limit int) ([
 		vulns[i] = h.Source
 	}
 	return vulns, result.Hits.Total.Value, nil
+}
+
+// AlertsHourly returns alert counts per hour for the last `hours` hours, oldest first.
+func (ic *IndexerClient) AlertsHourly(agentID string, hours int) ([]int, error) {
+	must := []map[string]any{
+		{"range": map[string]any{
+			"timestamp": map[string]any{"gte": fmt.Sprintf("now-%dh", hours)},
+		}},
+	}
+	if agentID != "" {
+		must = append(must, map[string]any{"term": map[string]any{"agent.id": agentID}})
+	}
+
+	body, err := json.Marshal(map[string]any{
+		"size":  0,
+		"query": map[string]any{"bool": map[string]any{"must": must}},
+		"aggs": map[string]any{
+			"by_hour": map[string]any{
+				"date_histogram": map[string]any{
+					"field":             "timestamp",
+					"calendar_interval": "hour",
+					"min_doc_count":     0,
+					"extended_bounds": map[string]any{
+						"min": fmt.Sprintf("now-%dh", hours),
+						"max": "now",
+					},
+				},
+			},
+		},
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, ic.baseURL+"/wazuh-alerts-*/_search", bytes.NewReader(body))
+	if err != nil {
+		return nil, err
+	}
+	req.SetBasicAuth(ic.username, ic.password)
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := ic.httpClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("indexer request failed: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		b, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("indexer HTTP %d: %s", resp.StatusCode, b)
+	}
+
+	var result struct {
+		Aggregations struct {
+			ByHour struct {
+				Buckets []struct {
+					DocCount int `json:"doc_count"`
+				} `json:"buckets"`
+			} `json:"by_hour"`
+		} `json:"aggregations"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return nil, err
+	}
+
+	counts := make([]int, len(result.Aggregations.ByHour.Buckets))
+	for i, b := range result.Aggregations.ByHour.Buckets {
+		counts[i] = b.DocCount
+	}
+	return counts, nil
+}
+
+// VulnsBySeverity returns vulnerability counts grouped by severity across all agents.
+func (ic *IndexerClient) VulnsBySeverity() (map[string]int, int, error) {
+	body, err := json.Marshal(map[string]any{
+		"size": 0,
+		"aggs": map[string]any{
+			"by_severity": map[string]any{
+				"terms": map[string]any{
+					"field": "vulnerability.severity",
+					"size":  20,
+				},
+			},
+		},
+	})
+	if err != nil {
+		return nil, 0, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost,
+		ic.baseURL+"/wazuh-states-vulnerabilities-*/_search", bytes.NewReader(body))
+	if err != nil {
+		return nil, 0, err
+	}
+	req.SetBasicAuth(ic.username, ic.password)
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := ic.httpClient.Do(req)
+	if err != nil {
+		return nil, 0, fmt.Errorf("indexer request failed: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		b, _ := io.ReadAll(resp.Body)
+		return nil, 0, fmt.Errorf("indexer HTTP %d: %s", resp.StatusCode, b)
+	}
+
+	var result struct {
+		Hits struct {
+			Total struct{ Value int `json:"value"` } `json:"total"`
+		} `json:"hits"`
+		Aggregations struct {
+			BySeverity struct {
+				Buckets []struct {
+					Key      string `json:"key"`
+					DocCount int    `json:"doc_count"`
+				} `json:"buckets"`
+			} `json:"by_severity"`
+		} `json:"aggregations"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return nil, 0, err
+	}
+
+	counts := map[string]int{}
+	for _, b := range result.Aggregations.BySeverity.Buckets {
+		counts[strings.ToLower(b.Key)] = b.DocCount
+	}
+	return counts, result.Hits.Total.Value, nil
 }
 
 // Search performs a full-text search across alert logs and descriptions.

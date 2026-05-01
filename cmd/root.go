@@ -73,6 +73,7 @@ func init() {
 		newClusterCmd(),
 		newAlertsCmd(),
 		newConfigCmd(),
+		newDashboardCmd(),
 	)
 }
 

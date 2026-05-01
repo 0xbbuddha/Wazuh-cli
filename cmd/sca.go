@@ -29,13 +29,13 @@ func newSCACmd() *cobra.Command {
 				output.JSON(policies)
 				return
 			}
-			t := output.NewTable("POLICY", "NAME", "PASS", "FAIL", "INVALID", "SCORE%", "LAST SCAN")
+			t := output.NewTable("POLICY", "NAME", "PASS", "FAIL", "INVALID", "SCORE", "LAST SCAN")
 			for _, p := range policies {
-				t.Row(p.PolicyID, output.Truncate(p.Name, 50),
+				t.Row(p.PolicyID, output.Truncate(p.Name, 40),
 					fmt.Sprintf("%d", p.PassCount),
 					fmt.Sprintf("%d", p.FailCount),
 					fmt.Sprintf("%d", p.InvalidCount),
-					fmt.Sprintf("%d", p.Score),
+					output.ProgressBar(p.Score),
 					p.EndScan)
 			}
 			t.Flush()
