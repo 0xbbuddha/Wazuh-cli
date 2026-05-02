@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
+	"sort"
+	"strings"
 	"syscall"
 	"time"
 
@@ -52,6 +54,27 @@ func newAlertsCmd() *cobra.Command {
 	listCmd.Flags().BoolVar(&watch, "watch", false, "Refresh alerts continuously")
 	listCmd.Flags().IntVar(&interval, "interval", 5, "Refresh interval in seconds (used with --watch)")
 	cmd.AddCommand(listCmd)
+
+	var heatmapAgent string
+	heatmapCmd := &cobra.Command{
+		Use:   "heatmap",
+		Short: "7-day x 24-hour alert volume heatmap",
+		Run: func(cmd *cobra.Command, args []string) {
+			matrix, err := indexerClient.AlertsHeatmap(heatmapAgent)
+			if err != nil {
+				die(err)
+			}
+			now := time.Now().UTC()
+			today := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, time.UTC)
+			var days [7]time.Time
+			for i := range days {
+				days[i] = today.AddDate(0, 0, i-6)
+			}
+			printHeatmap(matrix, days)
+		},
+	}
+	heatmapCmd.Flags().StringVar(&heatmapAgent, "agent", "", "Filter by agent ID")
+	cmd.AddCommand(heatmapCmd)
 
 	var searchLimit int
 	searchCmd := &cobra.Command{
@@ -133,4 +156,114 @@ func runWatch(limit, level int, agentID string, interval int) {
 
 func clearScreen() {
 	fmt.Print("\033[H\033[2J")
+}
+
+func printHeatmap(matrix [7][24]int, days [7]time.Time) {
+	// Collect all non-zero values to compute adaptive thresholds.
+	var nonZero []int
+	total := 0
+	for _, row := range matrix {
+		for _, v := range row {
+			total += v
+			if v > 0 {
+				nonZero = append(nonZero, v)
+			}
+		}
+	}
+	sort.Ints(nonZero)
+
+	p := func(pct float64) int {
+		if len(nonZero) == 0 {
+			return 0
+		}
+		idx := int(float64(len(nonZero)-1) * pct)
+		return nonZero[idx]
+	}
+	p33, p66, p90 := p(0.33), p(0.66), p(0.90)
+
+	cell := func(count int) string {
+		switch {
+		case count == 0:
+			return color.New(color.Faint).Sprint("·")
+		case count <= p33:
+			return color.New(color.FgGreen).Sprint("░")
+		case count <= p66:
+			return color.New(color.FgYellow).Sprint("▒")
+		case count <= p90:
+			return color.New(color.FgYellow, color.Bold).Sprint("▓")
+		default:
+			return color.New(color.FgRed, color.Bold).Sprint("█")
+		}
+	}
+
+	// Find peak hour.
+	peakDay, peakHour, peakCount := 0, 0, 0
+	for d, row := range matrix {
+		for h, v := range row {
+			if v > peakCount {
+				peakCount, peakDay, peakHour = v, d, h
+			}
+		}
+	}
+
+	faint := color.New(color.Faint)
+	bold := color.New(color.Bold)
+
+	bold.Printf("Alert Heatmap")
+	faint.Printf(" — last 7 days   total: %d alerts\n\n", total)
+
+	// Header: hour markers at 0h, 6h, 12h, 18h, 23h.
+	const labelW = 12
+	headerRunes := make([]rune, labelW+28)
+	for i := range headerRunes {
+		headerRunes[i] = ' '
+	}
+	for _, m := range []struct {
+		pos  int
+		text string
+	}{
+		{0, "0h"}, {6, "6h"}, {12, "12h"}, {18, "18h"}, {23, "23h"},
+	} {
+		for i, ch := range []rune(m.text) {
+			if labelW+m.pos+i < len(headerRunes) {
+				headerRunes[labelW+m.pos+i] = ch
+			}
+		}
+	}
+	faint.Println(string(headerRunes))
+
+	// Data rows.
+	for d, day := range days {
+		label := fmt.Sprintf("%-12s", day.Format("Mon 01/02 "))
+		dayTotal := 0
+		var sb strings.Builder
+		for h := range matrix[d] {
+			dayTotal += matrix[d][h]
+			sb.WriteString(cell(matrix[d][h]))
+		}
+		count := faint.Sprintf("  %4d", dayTotal)
+		peak := ""
+		if d == peakDay {
+			peak = color.New(color.FgRed, color.Faint).Sprint(" ← peak")
+		}
+		fmt.Printf("%s%s%s%s\n", label, sb.String(), count, peak)
+	}
+
+	// Legend.
+	fmt.Println()
+	faint.Printf("  ")
+	faint.Printf("·")
+	faint.Printf(" no alerts   ")
+	color.New(color.FgGreen).Printf("░")
+	faint.Printf(" low   ")
+	color.New(color.FgYellow).Printf("▒")
+	faint.Printf(" medium   ")
+	color.New(color.FgYellow, color.Bold).Printf("▓")
+	faint.Printf(" high   ")
+	color.New(color.FgRed, color.Bold).Printf("█")
+	faint.Printf(" peak\n")
+	if peakCount > 0 {
+		faint.Printf("  Peak: %d alerts/h  (%s %02d:00)\n",
+			peakCount, days[peakDay].Format("Mon 01/02"), peakHour)
+	}
 }
