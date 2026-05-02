@@ -15,11 +15,15 @@ Command-line interface for the **Wazuh REST API** (v4.x), written in Go.
 
 ## Features
 
-- JWT authentication with **automatic token refresh**
-- Colored table output (status, severity, alert levels)
-- `--output json` flag on every command for scripting
-- Covers the **Wazuh Manager API** (port 55000) and the **Wazuh Indexer / OpenSearch** (port 9200) for alerts
-
+- JWT authentication with automatic token refresh and disk cache
+- Colored output: status badges, severity indicators, alert levels
+- Progress bars for SCA scores `[████████████░░░░░░░░] 60%`
+- Sparklines for alert trends `▁▂▃▄▅▆▇█`
+- Severity badges `[CRITICAL]` `[HIGH]` `[MEDIUM]` `[LOW]`
+- Live TUI dashboard (`wazuh-cli dashboard`)
+- `--watch` mode for real-time alert monitoring
+- `--output json` on every command for scripting
+- Covers the **Wazuh Manager API** (port 55000) and **Wazuh Indexer / OpenSearch** (port 9200)
 
 ---
 
@@ -38,19 +42,19 @@ make build
 # binaries in build/linux-amd64/ and build/darwin-amd64/
 ```
 
-Or install directly into `$GOPATH/bin`:
-
-```bash
-make install
-```
-
 **Requirements:** Go 1.21+
 
 ---
 
 ## Configuration
 
-Create `~/.config/wazuh-cli/config.toml`:
+Run the interactive wizard to generate `~/.config/wazuh-cli/config.toml`:
+
+```bash
+wazuh-cli config init
+```
+
+Or create the file manually:
 
 ```toml
 api_url  = "https://wazuh-manager:55000"
@@ -60,7 +64,7 @@ insecure = true   # set to true if using a self-signed certificate
 username = "wazuh-wui"
 password = "wazuh-wui"
 
-# optional, required for the `alerts` commands
+# optional — required for alerts, heatmap, dashboard, vuln (Wazuh 4.8+)
 [indexer]
 url      = "https://wazuh-indexer:9200"
 username = "kibanaserver"
@@ -92,76 +96,73 @@ wazuh-cli agent summary                       # connection status counts
 wazuh-cli agent groups                        # list agent groups
 ```
 
-```
-ID    NAME         STATUS        IP            OS                VERSION   GROUP
-000   wazuh-mgr    active        127.0.0.1     Ubuntu 22.04      4.14.5    default
-001   web-server   active        10.0.0.10     Debian 12         4.14.5    webservers
-002   db-server    disconnected  10.0.0.20     CentOS 7          4.13.0    databases
-```
-
 ### manager
 
 ```bash
-wazuh-cli manager info       # version, type, ruleset
-wazuh-cli manager status     # status of all Wazuh daemons
-wazuh-cli manager logs       # last 20 log entries
+wazuh-cli manager info                        # version, type, path
+wazuh-cli manager status                      # status of all Wazuh daemons
+wazuh-cli manager logs                        # last 20 log entries
 wazuh-cli manager logs --lines 50
 ```
 
 ### syscollector
 
 ```bash
-wazuh-cli syscollector hardware  001          # CPU and RAM info
-wazuh-cli syscollector os        001          # OS details
-wazuh-cli syscollector packages  001          # installed packages
+wazuh-cli syscollector hardware  001
+wazuh-cli syscollector os        001
+wazuh-cli syscollector packages  001
 wazuh-cli syscollector packages  001 --search nginx
-wazuh-cli syscollector ports     001          # open / listening ports
-wazuh-cli syscollector processes 001          # running processes
-wazuh-cli syscollector netaddr   001          # network addresses
+wazuh-cli syscollector ports     001
+wazuh-cli syscollector processes 001
+wazuh-cli syscollector netaddr   001
 ```
 
 ### rules
 
 ```bash
-wazuh-cli rules list                   # list all rules
-wazuh-cli rules list --level 10        # rules with level >= 10
-wazuh-cli rules list --group sshd      # rules in group sshd
-wazuh-cli rules get 5710               # details for rule 5710
-wazuh-cli rules groups                 # list all rule groups
+wazuh-cli rules list
+wazuh-cli rules list --level 10
+wazuh-cli rules list --group sshd
 ```
 
 ### sca
 
+SCA scores are displayed with a color-coded progress bar.
+
 ```bash
-wazuh-cli sca list 001                        # SCA policies and scores for agent 001
-wazuh-cli sca checks 001 cis_ubuntu22-04      # detailed checks for a policy
+wazuh-cli sca list 001
+wazuh-cli sca checks 001 cis_ubuntu22-04
 ```
 
 ```
-POLICY             NAME                    PASS  FAIL  INVALID  SCORE%  LAST SCAN
-cis_ubuntu22-04    CIS Ubuntu 22.04 L1     143   21    0        87      2026-04-30
+POLICY           NAME                  PASS  FAIL  SCORE                      LAST SCAN
+cis_ubuntu22-04  CIS Ubuntu 22.04 L1   143   21    [████████████░░░░░░░░]  60%  2026-04-30
 ```
 
 ### vuln
 
+> Requires `[indexer]` section in config.toml for Wazuh 4.8+.
+
 ```bash
-wazuh-cli vuln list 001                       # all vulnerabilities for agent 001
-wazuh-cli vuln list 001 --severity critical   # critical only
-wazuh-cli vuln summary 001                    # counts grouped by severity
+wazuh-cli vuln list 001
+wazuh-cli vuln list 001 --severity critical
+wazuh-cli vuln list 001 --severity high
+wazuh-cli vuln summary 001
 ```
 
 ```
-CVE              SEVERITY   PACKAGE       VERSION   TITLE
-CVE-2024-3094    critical   xz-utils      5.4.1     Backdoor in liblzma
-CVE-2023-4911    high       glibc         2.35      Looney Tunables
+CVE             SEVERITY    SCORE  PACKAGE    VERSION
+CVE-2024-3094   [CRITICAL]  9.8    xz-utils   5.4.1
+CVE-2023-4911   [HIGH]      7.8    glibc      2.35
 ```
 
 ### cluster
 
 ```bash
-wazuh-cli cluster status    # enabled / running
-wazuh-cli cluster nodes     # list all nodes
-wazuh-cli cluster health    # health check
+wazuh-cli cluster status
+wazuh-cli cluster nodes
+wazuh-cli cluster health
+wazuh-cli cluster indexer   # OpenSearch cluster health (port 9200)
 ```
 
 ### alerts
@@ -169,16 +170,59 @@ wazuh-cli cluster health    # health check
 > Requires `[indexer]` section in config.toml.
 
 ```bash
-wazuh-cli alerts list                         # last 20 alerts
-wazuh-cli alerts list --limit 100 --level 8   # critical alerts (level >= 8)
-wazuh-cli alerts list --agent 001             # alerts for a specific agent
-wazuh-cli alerts search "failed password"     # full-text search
+wazuh-cli alerts list
+wazuh-cli alerts list --limit 100 --level 8
+wazuh-cli alerts list --agent 001
+wazuh-cli alerts list --watch                 # real-time refresh
+wazuh-cli alerts list --watch --interval 10
+wazuh-cli alerts search "failed password"
+wazuh-cli alerts heatmap                      # 7-day x 24-hour volume grid
+wazuh-cli alerts heatmap --agent 001
 ```
 
+The heatmap shows alert volume per hour over the last 7 days with adaptive color thresholds:
+
 ```
-TIMESTAMP                    LVL  AGENT       RULE   DESCRIPTION
-2026-04-30T10:42:01.123Z     10   web-server  5763   Multiple authentication failures
-2026-04-30T10:41:55.456Z     5    db-server   31103  Rootcheck: /tmp writable by group
+Alert Heatmap — last 7 days   total: 4,821 alerts
+
+            0h    6h    12h   18h  23h
+Mon 04/28   ·····▒▒▒░░░▓▓██████▓▓▒▒░░·····    842
+Tue 04/29   ·········░░░▒▒▓▓▓███▓▒▒░·······    631 <- peak
+
+  · no alerts   ░ low   ▒ medium   ▓ high   █ peak
+```
+
+### ar (active response)
+
+> Requires active response to be configured in `/var/ossec/etc/ossec.conf` on the manager.
+
+```bash
+wazuh-cli ar list                             # show available actions
+wazuh-cli ar run 001 restart                  # restart Wazuh agent
+wazuh-cli ar run 001 block-ip 1.2.3.4         # block an IP via iptables
+wazuh-cli ar run 001 unblock-ip 1.2.3.4       # remove IP block
+wazuh-cli ar run 001 host-deny 1.2.3.4        # add to /etc/hosts.deny
+wazuh-cli ar run all block-ip 1.2.3.4         # run on all agents (asks confirmation)
+wazuh-cli ar run all block-ip 1.2.3.4 --force # skip confirmation
+```
+
+### dashboard
+
+Live TUI dashboard showing agents, alert trend, vulnerabilities and recent alerts.
+
+```bash
+wazuh-cli dashboard                           # auto-refresh every 30s
+wazuh-cli dashboard --refresh 60
+wazuh-cli dashboard --refresh 0              # disable auto-refresh
+```
+
+Controls: `r` to refresh manually, `q` to quit.
+
+### config
+
+```bash
+wazuh-cli config           # show active configuration
+wazuh-cli config init      # interactive setup wizard
 ```
 
 ### JSON output
@@ -186,8 +230,9 @@ TIMESTAMP                    LVL  AGENT       RULE   DESCRIPTION
 All commands support `--output json` for piping or scripting:
 
 ```bash
-wazuh-cli agent list --output json | jq '.[] | select(.status == "disconnected")'
-wazuh-cli vuln list 001 --severity critical --output json | jq '.[].cve'
+wazuh-cli agent list -o json | jq '.[] | select(.status == "disconnected")'
+wazuh-cli vuln list 001 --severity critical -o json | jq '.[].cve'
+wazuh-cli alerts list -o json | jq '.[].rule.description'
 ```
 
 ---
@@ -199,12 +244,14 @@ wazuh-cli vuln list 001 --severity critical --output json | jq '.[].cve'
 | `agent` | `list`, `get`, `restart`, `summary`, `groups` |
 | `manager` | `info`, `status`, `logs` |
 | `syscollector` | `hardware`, `os`, `packages`, `ports`, `processes`, `netaddr` |
-| `rules` | `list`, `get`, `groups` |
+| `rules` | `list` |
 | `sca` | `list`, `checks` |
 | `vuln` | `list`, `summary` |
-| `cluster` | `status`, `nodes`, `health` |
-| `alerts` | `list`, `search` |
-| `config` | show active config |
+| `cluster` | `status`, `nodes`, `health`, `indexer` |
+| `alerts` | `list`, `search`, `heatmap` |
+| `ar` | `list`, `run` |
+| `dashboard` | |
+| `config` | `init` |
 
 ---
 
