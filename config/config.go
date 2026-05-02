@@ -1,6 +1,7 @@
 package config
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -42,7 +43,12 @@ func Load() (*Config, error) {
 	viper.SetDefault("indexer.username", "admin")
 
 	if err := viper.ReadInConfig(); err != nil {
-		return nil, fmt.Errorf("cannot read config: %w\n\nCreate ~/.config/wazuh-cli/config.toml", err)
+		var notFound viper.ConfigFileNotFoundError
+		if !errors.As(err, &notFound) {
+			return nil, fmt.Errorf("cannot read config: %w", err)
+		}
+		// Missing config file is OK — "config init" can create it.
+		return &Config{}, nil
 	}
 
 	var cfg Config

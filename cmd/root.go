@@ -35,6 +35,13 @@ var rootCmd = &cobra.Command{
 	Long:  "wazuh-cli — manage Wazuh agents, rules, SCA, vulnerabilities and alerts from the terminal.",
 	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 		output.Format = outputFormat
+		// Allow "config init" to run without a valid config file.
+		if cmd.Name() == "init" && cmd.Parent() != nil && cmd.Parent().Name() == "config" {
+			return nil
+		}
+		if managerClient == nil {
+			return fmt.Errorf("no configuration found\n\nRun: wazuh-cli config init")
+		}
 		return nil
 	},
 	Run: func(cmd *cobra.Command, args []string) {
@@ -84,7 +91,9 @@ func initConfig() {
 		fmt.Fprintln(os.Stderr, color.RedString("Error:")+" "+err.Error())
 		os.Exit(1)
 	}
-	managerClient = client.New(cfg.APIURL, cfg.Auth.Username, cfg.Auth.Password, cfg.Insecure)
+	if cfg.APIURL != "" {
+		managerClient = client.New(cfg.APIURL, cfg.Auth.Username, cfg.Auth.Password, cfg.Insecure)
+	}
 	if cfg.Indexer.URL != "" {
 		indexerClient = api.NewIndexerClient(cfg.Indexer.URL, cfg.Indexer.Username, cfg.Indexer.Password, cfg.Insecure)
 	}

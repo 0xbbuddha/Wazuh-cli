@@ -422,6 +422,87 @@ func (ic *IndexerClient) VulnsBySeverity() (map[string]int, int, error) {
 	return counts, result.Hits.Total.Value, nil
 }
 
+// AlertsHeatmap returns a [7][24]int matrix of alert counts per hour over the last 7 days.
+// Index [0] = oldest day (6 days ago), [6] = today. Inner index = UTC hour (0-23).
+func (ic *IndexerClient) AlertsHeatmap(agentID string) ([7][24]int, error) {
+	must := []map[string]any{
+		{"range": map[string]any{
+			"timestamp": map[string]any{"gte": "now-7d/d"},
+		}},
+	}
+	if agentID != "" {
+		must = append(must, map[string]any{"term": map[string]any{"agent.id": agentID}})
+	}
+
+	body, err := json.Marshal(map[string]any{
+		"size":  0,
+		"query": map[string]any{"bool": map[string]any{"must": must}},
+		"aggs": map[string]any{
+			"by_hour": map[string]any{
+				"date_histogram": map[string]any{
+					"field":             "timestamp",
+					"calendar_interval": "hour",
+					"min_doc_count":     0,
+					"extended_bounds": map[string]any{
+						"min": "now-7d/d",
+						"max": "now",
+					},
+				},
+			},
+		},
+	})
+	if err != nil {
+		return [7][24]int{}, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, ic.baseURL+"/wazuh-alerts-*/_search", bytes.NewReader(body))
+	if err != nil {
+		return [7][24]int{}, err
+	}
+	req.SetBasicAuth(ic.username, ic.password)
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := ic.httpClient.Do(req)
+	if err != nil {
+		return [7][24]int{}, fmt.Errorf("indexer request failed: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		b, _ := io.ReadAll(resp.Body)
+		return [7][24]int{}, fmt.Errorf("indexer HTTP %d: %s", resp.StatusCode, b)
+	}
+
+	var result struct {
+		Aggregations struct {
+			ByHour struct {
+				Buckets []struct {
+					Key      int64 `json:"key"` // Unix ms
+					DocCount int   `json:"doc_count"`
+				} `json:"buckets"`
+			} `json:"by_hour"`
+		} `json:"aggregations"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return [7][24]int{}, err
+	}
+
+	now := time.Now().UTC()
+	today := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, time.UTC)
+
+	var matrix [7][24]int
+	for _, b := range result.Aggregations.ByHour.Buckets {
+		t := time.UnixMilli(b.Key).UTC()
+		day := time.Date(t.Year(), t.Month(), t.Day(), 0, 0, 0, 0, time.UTC)
+		dayOffset := int(today.Sub(day).Hours() / 24)
+		if dayOffset < 0 || dayOffset > 6 {
+			continue
+		}
+		matrix[6-dayOffset][t.Hour()] = b.DocCount
+	}
+	return matrix, nil
+}
+
 // Search performs a full-text search across alert logs and descriptions.
 func (ic *IndexerClient) Search(queryStr string, limit int) ([]Alert, int, error) {
 	query := AlertsQuery{
