@@ -97,13 +97,39 @@ func newVulnCmd() *cobra.Command {
 	return cmd
 }
 
+type vulnFlatJSON struct {
+	CVE         string  `json:"cve"`
+	Severity    string  `json:"severity"`
+	Score       float64 `json:"score"`
+	Package     string  `json:"package"`
+	Version     string  `json:"version"`
+	Description string  `json:"description,omitempty"`
+	Published   string  `json:"published,omitempty"`
+	Agent       string  `json:"agent"`
+	AgentID     string  `json:"agent_id"`
+}
+
 func listVulnsFromIndexer(agentID, severity string, limit int) {
 	vulns, total, err := indexerClient.Vulnerabilities(agentID, severity, limit)
 	if err != nil {
 		die(err)
 	}
 	if output.Format == "json" {
-		output.JSON(vulns)
+		flat := make([]vulnFlatJSON, len(vulns))
+		for i, v := range vulns {
+			flat[i] = vulnFlatJSON{
+				CVE:         v.Vuln.ID,
+				Severity:    strings.ToLower(v.Vuln.Severity),
+				Score:       v.Vuln.Score.Base,
+				Package:     v.Package.Name,
+				Version:     v.Package.Version,
+				Description: v.Vuln.Description,
+				Published:   v.Vuln.Published,
+				Agent:       v.Agent.Name,
+				AgentID:     v.Agent.ID,
+			}
+		}
+		output.JSON(flat)
 		return
 	}
 	fmt.Printf("Showing %d of %d vulnerabilities (via indexer)\n\n", len(vulns), total)
