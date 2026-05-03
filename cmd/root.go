@@ -3,6 +3,7 @@ package cmd
 import (
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/fatih/color"
 	"github.com/spf13/cobra"
@@ -21,21 +22,49 @@ var (
 	cliVersion    string
 )
 
-var banner = `
-  ██╗    ██╗ █████╗ ███████╗██╗   ██╗██╗  ██╗    ██████╗██╗     ██╗
+// ── brand colors (fatih/color — used outside TUI) ────────────────────────────
+var (
+	brandDim    = color.New(color.Faint)
+	brandBright = color.New(color.Bold)
+	brandGreen  = color.New(color.FgGreen, color.Bold)
+	brandYellow = color.New(color.FgYellow)
+	brandRed    = color.New(color.FgRed, color.Bold)
+)
+
+// wazuhBlue renders text in Wazuh brand blue (#3595F9 → 256-color 33).
+func wazuhBlue(s string) string {
+	if color.NoColor {
+		return s
+	}
+	return "\033[38;5;33m\033[1m" + s + "\033[0m"
+}
+
+// brandBlue wraps wazuhBlue for Printf-style use.
+var brandBlue = color.New(color.FgHiBlue, color.Bold)
+
+var wazuhBanner = `  ██╗    ██╗ █████╗ ███████╗██╗   ██╗██╗  ██╗    ██████╗██╗     ██╗
   ██║    ██║██╔══██╗╚══███╔╝██║   ██║██║  ██║   ██╔════╝██║     ██║
   ██║ █╗ ██║███████║  ███╔╝ ██║   ██║███████║───██║     ██║     ██║
   ██║███╗██║██╔══██║ ███╔╝  ██║   ██║██╔══██║   ██║     ██║     ██║
   ╚███╔███╔╝██║  ██║███████╗╚██████╔╝██║  ██║   ╚██████╗███████╗██║
    ╚══╝╚══╝ ╚═╝  ╚═╝╚══════╝ ╚═════╝ ╚═╝  ╚═╝    ╚═════╝╚══════╝╚═╝`
 
+func printBanner() {
+	if color.NoColor {
+		fmt.Println(wazuhBanner)
+	} else {
+		fmt.Println("\033[38;5;33m\033[1m" + wazuhBanner + "\033[0m")
+	}
+	brandDim.Printf("  v%s  —  Wazuh REST API\n", cliVersion)
+}
+
+// ── root command ──────────────────────────────────────────────────────────────
 var rootCmd = &cobra.Command{
 	Use:   "wazuh-cli",
 	Short: "CLI for the Wazuh REST API",
 	Long:  "wazuh-cli — manage Wazuh agents, rules, SCA, vulnerabilities and alerts from the terminal.",
 	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 		output.Format = outputFormat
-		// Allow "config init" to run without a valid config file.
 		if cmd.Name() == "init" && cmd.Parent() != nil && cmd.Parent().Name() == "config" {
 			return nil
 		}
@@ -46,18 +75,80 @@ var rootCmd = &cobra.Command{
 	},
 	Run: func(cmd *cobra.Command, args []string) {
 		printBanner()
-		fmt.Println()
-		cmd.Help()
+		printCustomHelp(cmd)
 	},
 }
 
-func printBanner() {
-	cyan := color.New(color.FgCyan, color.Bold)
-	cyan.Println(banner)
-	dim := color.New(color.Faint)
-	dim.Printf("  CLI %s — Wazuh REST API\n", cliVersion)
+// ── custom help ───────────────────────────────────────────────────────────────
+func printCustomHelp(cmd *cobra.Command) {
+	sep := brandDim.Sprint(strings.Repeat("─", 52))
+
+	if cmd.Short != "" {
+		fmt.Printf("\n  %s\n", brandDim.Sprint(cmd.Short))
+	}
+
+	// Usage
+	fmt.Printf("\n  %s\n", brandBlue.Sprint("USAGE"))
+	fmt.Printf("    %s\n", brandBright.Sprint(cmd.UseLine()))
+	if cmd.HasAvailableSubCommands() {
+		fmt.Printf("    %s\n", brandBright.Sprint(cmd.CommandPath()+" [command]"))
+	}
+
+	fmt.Printf("\n  %s\n", sep)
+
+	// Subcommands
+	if cmd.HasAvailableSubCommands() {
+		fmt.Printf("\n  %s\n", brandBlue.Sprint("COMMANDS"))
+		for _, c := range cmd.Commands() {
+			if !c.IsAvailableCommand() || c.Hidden {
+				continue
+			}
+			aliases := ""
+			if len(c.Aliases) > 0 {
+				aliases = brandDim.Sprintf("  (%s)", strings.Join(c.Aliases, ", "))
+			}
+			fmt.Printf("    %s  %s%s\n",
+				brandBlue.Sprintf("%-20s", c.Name()),
+				c.Short,
+				aliases)
+		}
+	}
+
+	// Local flags
+	if f := strings.TrimRight(cmd.Flags().FlagUsages(), "\n"); strings.TrimSpace(f) != "" {
+		fmt.Printf("\n  %s\n", brandBlue.Sprint("FLAGS"))
+		for _, line := range strings.Split(f, "\n") {
+			if strings.TrimSpace(line) != "" {
+				fmt.Printf("  %s\n", line)
+			}
+		}
+	}
+
+	// Inherited/global flags
+	if f := strings.TrimRight(cmd.InheritedFlags().FlagUsages(), "\n"); strings.TrimSpace(f) != "" {
+		fmt.Printf("\n  %s\n", brandBlue.Sprint("GLOBAL FLAGS"))
+		for _, line := range strings.Split(f, "\n") {
+			if strings.TrimSpace(line) != "" {
+				fmt.Printf("  %s\n", line)
+			}
+		}
+	}
+
+	// Examples
+	if cmd.Example != "" {
+		fmt.Printf("\n  %s\n", brandBlue.Sprint("EXAMPLES"))
+		for _, line := range strings.Split(cmd.Example, "\n") {
+			fmt.Printf("  %s\n", brandDim.Sprint(line))
+		}
+	}
+
+	fmt.Printf("\n  %s\n", sep)
+	fmt.Printf("\n  %s\n\n",
+		brandDim.Sprintf("Run %s --help for more info on a command.",
+			brandBlue.Sprint(cmd.CommandPath()+" [command]")))
 }
 
+// ── execute ───────────────────────────────────────────────────────────────────
 func Execute(version string) {
 	cliVersion = version
 	rootCmd.Version = version
@@ -83,6 +174,15 @@ func init() {
 		newDashboardCmd(),
 		newARCmd(),
 	)
+
+	// Custom help for all commands — shows banner only for root
+	rootCmd.SetHelpFunc(func(cmd *cobra.Command, args []string) {
+		if cmd == rootCmd {
+			printBanner()
+			fmt.Println()
+		}
+		printCustomHelp(cmd)
+	})
 }
 
 func initConfig() {
