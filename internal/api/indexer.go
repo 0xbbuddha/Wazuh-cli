@@ -239,10 +239,11 @@ type vulnHitsResponse struct {
 	} `json:"hits"`
 }
 
-// Vulnerabilities queries wazuh-states-vulnerabilities-* for a given agent (Wazuh 4.8+).
+// Vulnerabilities queries wazuh-states-vulnerabilities-*. agentID="" queries all agents.
 func (ic *IndexerClient) Vulnerabilities(agentID, severity string, limit int) ([]IndexerVulnerability, int, error) {
-	must := []map[string]any{
-		{"term": map[string]any{"agent.id": agentID}},
+	must := []map[string]any{}
+	if agentID != "" {
+		must = append(must, map[string]any{"term": map[string]any{"agent.id": agentID}})
 	}
 	if severity != "" {
 		// Indexer stores severity in title case ("Critical", not "critical").
@@ -501,6 +502,54 @@ func (ic *IndexerClient) AlertsHeatmap(agentID string) ([7][24]int, error) {
 		matrix[6-dayOffset][t.Hour()] = b.DocCount
 	}
 	return matrix, nil
+}
+
+// AlertsFiltered combines a text query with level and agent filters.
+func (ic *IndexerClient) AlertsFiltered(query string, minLevel int, agentID string, limit int) ([]Alert, int, error) {
+	var must []map[string]any
+	if minLevel > 0 {
+		must = append(must, map[string]any{
+			"range": map[string]any{"rule.level": map[string]any{"gte": minLevel}},
+		})
+	}
+	if agentID != "" {
+		must = append(must, map[string]any{"term": map[string]any{"agent.id": agentID}})
+	}
+
+	textQ := map[string]any{
+		"multi_match": map[string]any{
+			"query":  query,
+			"fields": []string{"rule.description", "agent.name", "full_log"},
+		},
+	}
+
+	var q map[string]any
+	if len(must) > 0 {
+		q = map[string]any{"bool": map[string]any{
+			"must":                 must,
+			"should":               []map[string]any{textQ},
+			"minimum_should_match": 1,
+		}}
+	} else {
+		q = map[string]any{"bool": map[string]any{
+			"should":               []map[string]any{textQ},
+			"minimum_should_match": 1,
+		}}
+	}
+
+	result, err := ic.search("wazuh-alerts-*", AlertsQuery{
+		Query: q,
+		Sort:  []map[string]any{{"timestamp": map[string]any{"order": "desc"}}},
+		Size:  limit,
+	})
+	if err != nil {
+		return nil, 0, err
+	}
+	alerts := make([]Alert, len(result.Hits.Items))
+	for i, h := range result.Hits.Items {
+		alerts[i] = h.Source
+	}
+	return alerts, result.Hits.Total.Value, nil
 }
 
 // Search performs a full-text search across alert logs and descriptions.

@@ -8,297 +8,377 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/spf13/cobra"
-
-	"github.com/0xbbuddha/wazuh-cli/internal/api"
-	"github.com/0xbbuddha/wazuh-cli/internal/output"
 )
 
-// ---------- styles ----------
-
+// ── palette ───────────────────────────────────────────────────────────────────
 var (
-	dashPanelStyle = lipgloss.NewStyle().
-			Border(lipgloss.RoundedBorder()).
-			BorderForeground(lipgloss.Color("240")).
-			Padding(0, 1)
+	clrPrimary  = lipgloss.Color("39")  // Wazuh blue
+	clrSuccess  = lipgloss.Color("46")  // green
+	clrWarn     = lipgloss.Color("214") // orange
+	clrDanger   = lipgloss.Color("196") // red
+	clrHigh     = lipgloss.Color("202") // red-orange
+	clrBorder   = lipgloss.Color("240") // panel borders
+	clrDim      = lipgloss.Color("245") // dim text
+	clrBright   = lipgloss.Color("255") // bright text
+	clrBarBg    = lipgloss.Color("235") // header/footer bg
+	clrTabBg    = lipgloss.Color("233") // tab bar bg
+	clrSel      = lipgloss.Color("237") // selected row bg
+	clrInputBg  = lipgloss.Color("236") // search input bg
 
-	dashTitleStyle = lipgloss.NewStyle().
-			Bold(true).
-			Foreground(lipgloss.Color("86"))
+	dPanelStyle   = lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(clrBorder).Padding(0, 1)
+	dTitleStyle   = lipgloss.NewStyle().Bold(true).Foreground(clrPrimary)
+	dDimStyle     = lipgloss.NewStyle().Foreground(clrDim)
+	dBrightStyle  = lipgloss.NewStyle().Bold(true).Foreground(clrBright)
+	dSuccessStyle = lipgloss.NewStyle().Foreground(clrSuccess)
+	dWarnStyle    = lipgloss.NewStyle().Foreground(clrWarn)
+	dDangerStyle  = lipgloss.NewStyle().Bold(true).Foreground(clrDanger)
+	dSelStyle     = lipgloss.NewStyle().Background(clrSel)
 
-	dashDimStyle = lipgloss.NewStyle().
-			Foreground(lipgloss.Color("240"))
-
-	dashSevStyles = map[string]lipgloss.Style{
-		"critical": lipgloss.NewStyle().Foreground(lipgloss.Color("196")).Bold(true),
-		"high":     lipgloss.NewStyle().Foreground(lipgloss.Color("196")),
-		"medium":   lipgloss.NewStyle().Foreground(lipgloss.Color("214")),
-		"low":      lipgloss.NewStyle().Foreground(lipgloss.Color("46")),
+	dSevStyles = map[string]lipgloss.Style{
+		"critical": lipgloss.NewStyle().Bold(true).Foreground(clrDanger),
+		"high":     lipgloss.NewStyle().Foreground(clrHigh),
+		"medium":   lipgloss.NewStyle().Foreground(clrWarn),
+		"low":      lipgloss.NewStyle().Foreground(clrSuccess),
 	}
-
-	dashActiveStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("46"))
-	dashAlertStyle  = lipgloss.NewStyle().Foreground(lipgloss.Color("196"))
 )
 
-// ---------- messages ----------
+// ── tabs ──────────────────────────────────────────────────────────────────────
+const (
+	tabOverview = 0
+	tabDiscover = 1
+	tabAgents   = 2
+	tabVulns    = 3
+	numTabs     = 4
+)
 
-type dashDataMsg struct {
-	agentSummary *api.AgentSummary
-	alertCounts  []int
-	alertTotal   int
-	recentAlerts []api.Alert
-	vulnCounts   map[string]int
-	vulnTotal    int
-	loadedAt     time.Time
+var tabLabels = [numTabs]string{"Overview", "Discover", "Agents", "Vulns"}
+
+// ── modal ─────────────────────────────────────────────────────────────────────
+type modalModel struct {
+	title  string
+	lines  []string
+	scroll int
 }
 
-type dashTickMsg time.Time
+// ── tick ──────────────────────────────────────────────────────────────────────
+type dashTickMsg struct{ frame int }
 
-// ---------- model ----------
+func dashTick(frame int) tea.Cmd {
+	return tea.Tick(100*time.Millisecond, func(_ time.Time) tea.Msg {
+		return dashTickMsg{frame: (frame + 1) % 10}
+	})
+}
 
 var dashSpinChars = []string{"⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"}
 
+// ── main model ────────────────────────────────────────────────────────────────
 type dashModel struct {
 	width, height int
+	activeTab     int
+	overview      overviewTab
+	discover      discoverTab
+	agents        agentsTab
+	vulns         vulnsTab
+	modal         *modalModel
 	refreshSecs   int
-	loading       bool
 	spinFrame     int
-	loadedAt      time.Time
-	data          *dashDataMsg
 }
 
 func newDashModel(refreshSecs int) dashModel {
-	return dashModel{loading: true, refreshSecs: refreshSecs}
-}
-
-func (m dashModel) Init() tea.Cmd {
-	return tea.Batch(dashLoad(), dashTick())
-}
-
-func dashLoad() tea.Cmd {
-	return func() tea.Msg {
-		msg := dashDataMsg{loadedAt: time.Now()}
-
-		agAPI := api.NewAgentsAPI(managerClient)
-		if s, err := agAPI.Summary(); err == nil {
-			msg.agentSummary = s
-		}
-
-		if indexerClient != nil {
-			if counts, err := indexerClient.AlertsHourly("", 24); err == nil {
-				msg.alertCounts = counts
-			}
-			if alerts, total, err := indexerClient.Alerts(10, 0, ""); err == nil {
-				msg.recentAlerts = alerts
-				msg.alertTotal = total
-			}
-			if counts, total, err := indexerClient.VulnsBySeverity(); err == nil {
-				msg.vulnCounts = counts
-				msg.vulnTotal = total
-			}
-		}
-
-		return msg
+	return dashModel{
+		refreshSecs: refreshSecs,
+		overview:    newOverviewTab(refreshSecs),
+		discover:    newDiscoverTab(),
+		agents:      newAgentsTab(),
+		vulns:       newVulnsTab(),
 	}
 }
 
-func dashTick() tea.Cmd {
-	return tea.Tick(100*time.Millisecond, func(t time.Time) tea.Msg {
-		return dashTickMsg(t)
-	})
+func (m dashModel) Init() tea.Cmd {
+	return tea.Batch(m.overview.init(), dashTick(0))
 }
 
 func (m dashModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
+
 	case tea.WindowSizeMsg:
 		m.width, m.height = msg.Width, msg.Height
-
-	case tea.KeyMsg:
-		switch msg.String() {
-		case "q", "ctrl+c":
-			return m, tea.Quit
-		case "r":
-			m.loading = true
-			return m, dashLoad()
-		}
-
-	case dashDataMsg:
-		m.loading = false
-		m.loadedAt = msg.loadedAt
-		m.data = &msg
+		return m, nil
 
 	case dashTickMsg:
-		m.spinFrame = (m.spinFrame + 1) % len(dashSpinChars)
-		cmds := []tea.Cmd{dashTick()}
-		if m.refreshSecs > 0 && !m.loadedAt.IsZero() &&
-			time.Since(m.loadedAt) >= time.Duration(m.refreshSecs)*time.Second {
-			m.loading = true
-			cmds = append(cmds, dashLoad())
+		m.spinFrame = msg.frame
+		var cmds []tea.Cmd
+		cmds = append(cmds, dashTick(msg.frame))
+		// Always propagate tick to overview for auto-refresh
+		var cmd tea.Cmd
+		m.overview, _, cmd = m.overview.update(msg, m.width, m.height)
+		if cmd != nil {
+			cmds = append(cmds, cmd)
 		}
 		return m, tea.Batch(cmds...)
+
+	case tea.KeyMsg:
+		if m.modal != nil {
+			return m.handleModalKey(msg)
+		}
+		if msg.String() == "ctrl+c" {
+			return m, tea.Quit
+		}
+		if msg.String() == "q" && !m.tabIsCapturingInput() {
+			return m, tea.Quit
+		}
+		// Tab switches
+		switch msg.String() {
+		case "1":
+			m.activeTab = tabOverview
+			return m, nil
+		case "2":
+			return m.switchTab(tabDiscover)
+		case "3":
+			return m.switchTab(tabAgents)
+		case "4":
+			return m.switchTab(tabVulns)
+		case "tab":
+			return m.switchTab((m.activeTab + 1) % numTabs)
+		case "shift+tab":
+			return m.switchTab((m.activeTab - 1 + numTabs) % numTabs)
+		}
 	}
 
+	return m.routeToActiveTab(msg)
+}
+
+func (m dashModel) handleModalKey(msg tea.KeyMsg) (dashModel, tea.Cmd) {
+	switch msg.String() {
+	case "esc", "q", "enter":
+		m.modal = nil
+	case "j", "down":
+		m.modal.scroll++
+	case "k", "up":
+		if m.modal.scroll > 0 {
+			m.modal.scroll--
+		}
+	}
 	return m, nil
 }
 
+func (m dashModel) tabIsCapturingInput() bool {
+	switch m.activeTab {
+	case tabDiscover:
+		return m.discover.searchMode
+	case tabAgents:
+		return m.agents.searchMode || m.agents.arSt != arNone
+	}
+	return false
+}
+
+func (m dashModel) switchTab(tab int) (dashModel, tea.Cmd) {
+	m.activeTab = tab
+	switch tab {
+	case tabDiscover:
+		if !m.discover.loaded {
+			m.discover.loading = true
+			return m, discoverLoad(m.discover)
+		}
+	case tabAgents:
+		if !m.agents.loaded {
+			m.agents.loading = true
+			return m, agentsLoad()
+		}
+	case tabVulns:
+		if !m.vulns.loaded {
+			m.vulns.loading = true
+			return m, vulnsLoad(m.vulns)
+		}
+	}
+	return m, nil
+}
+
+func (m dashModel) routeToActiveTab(msg tea.Msg) (dashModel, tea.Cmd) {
+	var modal *modalModel
+	var cmd tea.Cmd
+	switch m.activeTab {
+	case tabOverview:
+		m.overview, modal, cmd = m.overview.update(msg, m.width, m.height)
+	case tabDiscover:
+		m.discover, modal, cmd = m.discover.update(msg, m.width, m.height)
+	case tabAgents:
+		m.agents, modal, cmd = m.agents.update(msg, m.width, m.height)
+	case tabVulns:
+		m.vulns, modal, cmd = m.vulns.update(msg, m.width, m.height)
+	}
+	if modal != nil {
+		m.modal = modal
+	}
+	return m, cmd
+}
+
+// ── view ──────────────────────────────────────────────────────────────────────
 func (m dashModel) View() string {
 	if m.width == 0 {
 		return ""
 	}
-
-	statusStr := dashDimStyle.Render("q quit  r refresh")
-	if m.loading {
-		statusStr = dashSpinChars[m.spinFrame] + " loading..."
-	} else if !m.loadedAt.IsZero() {
-		statusStr = dashDimStyle.Render(fmt.Sprintf(
-			"q quit  r refresh  %s  auto: %ds",
-			m.loadedAt.Format("15:04:05"), m.refreshSecs))
-	}
-	header := dashTitleStyle.Render("WAZUH-CLI DASHBOARD") + "  " + statusStr
-
-	if m.data == nil {
-		return header + "\n\n" + dashDimStyle.Render("Loading...")
+	if m.modal != nil {
+		return m.renderModalView()
 	}
 
-	// Each panel has border (1+1) + padding (1+1) = 4 chars horizontal overhead.
-	// Two columns + 2-char gap: 2*(colW) + 2 = m.width  →  colW = (m.width-2)/2
-	colW := (m.width - 2) / 2
-	if colW < 24 {
-		colW = 24
-	}
-	// Inner text width available inside each panel.
-	textW := colW - 4
-	if textW < 10 {
-		textW = 10
+	contentH := m.height - 3
+	if contentH < 4 {
+		contentH = 4
 	}
 
-	leftCol := lipgloss.JoinVertical(lipgloss.Left,
-		m.renderAgentsPanel(colW, textW),
-		m.renderVulnPanel(colW, textW),
-	)
-	rightCol := lipgloss.JoinVertical(lipgloss.Left,
-		m.renderAlertTrendPanel(colW, textW),
-		m.renderRecentAlertsPanel(colW, textW),
-	)
+	var content string
+	switch m.activeTab {
+	case tabOverview:
+		content = m.overview.view(m.width, contentH, m.spinFrame)
+	case tabDiscover:
+		content = m.discover.view(m.width, contentH, m.spinFrame)
+	case tabAgents:
+		content = m.agents.view(m.width, contentH, m.spinFrame)
+	case tabVulns:
+		content = m.vulns.view(m.width, contentH, m.spinFrame)
+	}
 
-	body := lipgloss.JoinHorizontal(lipgloss.Top, leftCol, "  ", rightCol)
-	return header + "\n\n" + body
+	return strings.Join([]string{
+		m.renderHeader(),
+		m.renderTabBar(),
+		content,
+		m.renderStatusBar(),
+	}, "\n")
 }
 
-// ---------- panel renderers ----------
-
-func (m dashModel) renderAgentsPanel(colW, textW int) string {
-	var sb strings.Builder
-	sb.WriteString(dashTitleStyle.Render("Agents") + "\n\n")
-
-	if m.data.agentSummary == nil {
-		sb.WriteString(dashDimStyle.Render("unavailable"))
-	} else {
-		s := m.data.agentSummary.Connection
-		sb.WriteString(fmt.Sprintf("%-22s %s\n", "Active:",
-			dashActiveStyle.Render(fmt.Sprintf("%d", s.Active))))
-		sb.WriteString(fmt.Sprintf("%-22s %s\n", "Disconnected:",
-			dashAlertStyle.Render(fmt.Sprintf("%d", s.Disconnected))))
-		sb.WriteString(fmt.Sprintf("%-22s %d\n", "Pending:", s.Pending))
-		sb.WriteString(fmt.Sprintf("%-22s %s\n", "Never connected:",
-			dashDimStyle.Render(fmt.Sprintf("%d", s.NeverConnected))))
-		sb.WriteString(fmt.Sprintf("%-22s %d", "Total:", s.Total))
+// ── header ────────────────────────────────────────────────────────────────────
+func (m dashModel) renderHeader() string {
+	logo := lipgloss.NewStyle().Bold(true).Foreground(clrPrimary).Render("  WAZUH-CLI")
+	right := dDimStyle.Render("Interactive Dashboard  ")
+	gap := m.width - lipgloss.Width(logo) - lipgloss.Width(right)
+	if gap < 0 {
+		gap = 0
 	}
-
-	return dashPanelStyle.Width(colW).Render(sb.String())
+	return lipgloss.NewStyle().Background(clrBarBg).Width(m.width).
+		Render(logo + strings.Repeat(" ", gap) + right)
 }
 
-func (m dashModel) renderVulnPanel(colW, textW int) string {
-	var sb strings.Builder
-	sb.WriteString(dashTitleStyle.Render("Vulnerabilities") + "\n\n")
-
-	if indexerClient == nil {
-		sb.WriteString(dashDimStyle.Render("configure [indexer] in config.toml"))
-	} else if m.data.vulnCounts == nil {
-		sb.WriteString(dashDimStyle.Render("unavailable"))
-	} else {
-		for _, sev := range []string{"critical", "high", "medium", "low"} {
-			style := dashSevStyles[sev]
-			count := m.data.vulnCounts[sev]
-			sb.WriteString(fmt.Sprintf("%-12s %s\n",
-				strings.ToUpper(sev)+":",
-				style.Render(fmt.Sprintf("%d", count))))
+// ── tab bar ───────────────────────────────────────────────────────────────────
+func (m dashModel) renderTabBar() string {
+	var parts []string
+	for i, name := range tabLabels {
+		label := fmt.Sprintf("  %d:%s  ", i+1, name)
+		if i == m.activeTab {
+			parts = append(parts, lipgloss.NewStyle().Bold(true).Foreground(clrPrimary).Render(label))
+		} else {
+			parts = append(parts, dDimStyle.Render(label))
 		}
-		sb.WriteString("\n")
-		sb.WriteString(dashDimStyle.Render(fmt.Sprintf("Total: %d", m.data.vulnTotal)))
+		if i < numTabs-1 {
+			parts = append(parts, dDimStyle.Render("│"))
+		}
 	}
-
-	return dashPanelStyle.Width(colW).Render(sb.String())
+	return lipgloss.NewStyle().Background(clrTabBg).Width(m.width).Render(strings.Join(parts, ""))
 }
 
-func (m dashModel) renderAlertTrendPanel(colW, textW int) string {
-	var sb strings.Builder
-	sb.WriteString(dashTitleStyle.Render("Alert Trend (24h)") + "\n\n")
-
-	if indexerClient == nil {
-		sb.WriteString(dashDimStyle.Render("configure [indexer] in config.toml"))
-	} else if len(m.data.alertCounts) == 0 {
-		sb.WriteString(dashDimStyle.Render("no data"))
-	} else {
-		total := 0
-		for _, c := range m.data.alertCounts {
-			total += c
-		}
-		sb.WriteString(fmt.Sprintf("Total: %d alerts\n\n", total))
-
-		counts := m.data.alertCounts
-		if len(counts) > textW {
-			counts = counts[len(counts)-textW:]
-		}
-		spark := output.Sparkline(counts)
-		sb.WriteString(spark + "\n\n")
-
-		nHours := len(counts)
-		left := fmt.Sprintf("%dh ago", nHours)
-		spaces := textW - len(left) - 3
-		if spaces < 1 {
-			spaces = 1
-		}
-		sb.WriteString(dashDimStyle.Render(left + strings.Repeat(" ", spaces) + "now"))
+// ── status bar ────────────────────────────────────────────────────────────────
+func (m dashModel) renderStatusBar() string {
+	key := func(k, desc string) string {
+		return lipgloss.NewStyle().Bold(true).Foreground(clrPrimary).Render(k) + " " + dDimStyle.Render(desc)
 	}
-
-	return dashPanelStyle.Width(colW).Render(sb.String())
+	hints := []string{key("1-4", "tabs"), key("Tab", "next"), key("q", "quit")}
+	switch m.activeTab {
+	case tabDiscover:
+		hints = append(hints, key("/", "search"), key("f", "level"), key("↑↓", "nav"), key("Enter", "detail"), key("r", "refresh"))
+	case tabAgents:
+		hints = append(hints, key("/", "filter"), key("↑↓", "nav"), key("Enter", "detail"), key("a", "active-response"), key("r", "refresh"))
+	case tabVulns:
+		hints = append(hints, key("f", "severity"), key("↑↓", "nav"), key("Enter", "detail"), key("r", "refresh"))
+	case tabOverview:
+		hints = append(hints, key("r", "refresh"))
+	}
+	return lipgloss.NewStyle().Background(clrBarBg).Width(m.width).Render("  " + strings.Join(hints, "   "))
 }
 
-func (m dashModel) renderRecentAlertsPanel(colW, textW int) string {
-	title := fmt.Sprintf("Recent Alerts (%d total)", m.data.alertTotal)
-	var sb strings.Builder
-	sb.WriteString(dashTitleStyle.Render(title) + "\n\n")
+// ── modal view ────────────────────────────────────────────────────────────────
+func (m dashModel) renderModalView() string {
+	modal := m.modal
+	mW := m.width * 3 / 4
+	if mW > 120 {
+		mW = 120
+	}
+	if mW < 40 {
+		mW = 40
+	}
+	innerW := mW - 6
+	innerH := m.height*2/3 - 8
+	if innerH < 4 {
+		innerH = 4
+	}
 
-	if indexerClient == nil {
-		sb.WriteString(dashDimStyle.Render("configure [indexer] in config.toml"))
-	} else if len(m.data.recentAlerts) == 0 {
-		sb.WriteString(dashDimStyle.Render("no recent alerts"))
-	} else {
-		maxDescLen := textW - 20
-		if maxDescLen < 10 {
-			maxDescLen = 10
-		}
-		for i, a := range m.data.recentAlerts {
-			desc := output.Truncate(a.Rule.Description, maxDescLen)
-			agent := output.Truncate(a.Agent.Name, 12)
-			line := fmt.Sprintf("%s %-14s %s", output.ColorLevel(a.Rule.Level), agent, desc)
-			if i < len(m.data.recentAlerts)-1 {
-				line += "\n"
+	// Clamp scroll
+	if modal.scroll+innerH > len(modal.lines) {
+		modal.scroll = max(0, len(modal.lines)-innerH)
+	}
+	end := modal.scroll + innerH
+	if end > len(modal.lines) {
+		end = len(modal.lines)
+	}
+
+	var sb strings.Builder
+	for _, line := range modal.lines[modal.scroll:end] {
+		if lipgloss.Width(line) > innerW {
+			runes := []rune(line)
+			if len(runes) > innerW {
+				line = string(runes[:innerW])
 			}
-			sb.WriteString(line)
 		}
+		sb.WriteString(line + "\n")
 	}
 
-	return dashPanelStyle.Width(colW).Render(sb.String())
+	scrollHint := ""
+	if len(modal.lines) > innerH {
+		scrollHint = dDimStyle.Render(fmt.Sprintf(" [%d/%d]", modal.scroll+1, len(modal.lines)))
+	}
+
+	box := lipgloss.NewStyle().
+		Border(lipgloss.RoundedBorder()).BorderForeground(clrPrimary).
+		Width(mW).Padding(1, 2).
+		Render(
+			dTitleStyle.Render("  "+modal.title)+scrollHint+"\n"+
+				dDimStyle.Render(strings.Repeat("─", innerW))+"\n\n"+
+				strings.TrimRight(sb.String(), "\n")+"\n\n"+
+				dDimStyle.Render("esc · q  close    ↑↓ · jk  scroll"),
+		)
+
+	return lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center, box)
 }
 
-// ---------- command ----------
+// ── shared helpers ────────────────────────────────────────────────────────────
+func dashFmt(n int) string {
+	s := fmt.Sprintf("%d", n)
+	if len(s) <= 3 {
+		return s
+	}
+	var out []byte
+	for i, c := range s {
+		if i > 0 && (len(s)-i)%3 == 0 {
+			out = append(out, ',')
+		}
+		out = append(out, byte(c))
+	}
+	return string(out)
+}
 
+func renderLoading(w, h, frame int) string {
+	if frame < 0 || frame >= len(dashSpinChars) {
+		frame = 0
+	}
+	return lipgloss.Place(w, h, lipgloss.Center, lipgloss.Center,
+		dDimStyle.Render(dashSpinChars[frame]+" Loading..."))
+}
+
+// ── command ───────────────────────────────────────────────────────────────────
 func newDashboardCmd() *cobra.Command {
 	var refreshSecs int
 	cmd := &cobra.Command{
 		Use:     "dashboard",
-		Short:   "Live TUI dashboard (agents, alerts, vulnerabilities)",
+		Short:   "Interactive TUI dashboard (agents, alerts, vulnerabilities)",
 		Aliases: []string{"dash"},
 		Run: func(cmd *cobra.Command, args []string) {
 			p := tea.NewProgram(newDashModel(refreshSecs), tea.WithAltScreen())
