@@ -186,3 +186,62 @@ func (c *Client) Put(path string, payload any) error {
 	}
 	return nil
 }
+
+// PutDecode is like Put but also decodes the response body into dst.
+func (c *Client) PutDecode(path string, payload any, dst any) error {
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(payload); err != nil {
+		return err
+	}
+	resp, err := c.Do(http.MethodPut, path, &buf)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		b, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("HTTP %d: %s", resp.StatusCode, b)
+	}
+	if dst != nil {
+		return json.NewDecoder(resp.Body).Decode(dst)
+	}
+	return nil
+}
+
+// Post is a helper for POST requests with a JSON body that decodes the response into dst.
+func (c *Client) Post(path string, payload any, dst any) error {
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(payload); err != nil {
+		return err
+	}
+	resp, err := c.Do(http.MethodPost, path, &buf)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusCreated {
+		b, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("HTTP %d: %s", resp.StatusCode, b)
+	}
+	if dst != nil {
+		return json.NewDecoder(resp.Body).Decode(dst)
+	}
+	return nil
+}
+
+// Delete is a helper for DELETE requests that decodes the response into dst.
+func (c *Client) Delete(path string, dst any) error {
+	resp, err := c.Do(http.MethodDelete, path, nil)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		b, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("HTTP %d: %s", resp.StatusCode, b)
+	}
+	if dst != nil {
+		return json.NewDecoder(resp.Body).Decode(dst)
+	}
+	return nil
+}
