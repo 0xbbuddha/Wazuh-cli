@@ -8,9 +8,18 @@ type APIResponse[T any] struct {
 }
 
 type APIData[T any] struct {
-	AffectedItems      []T `json:"affected_items"`
-	TotalAffectedItems int `json:"total_affected_items"`
-	TotalFailedItems   int `json:"total_failed_items"`
+	AffectedItems      []T            `json:"affected_items"`
+	TotalAffectedItems int            `json:"total_affected_items"`
+	TotalFailedItems   int            `json:"total_failed_items"`
+	FailedItems        []APIFailedItem `json:"failed_items"`
+}
+
+type APIFailedItem struct {
+	ID    []string `json:"id"`
+	Error struct {
+		Code    int    `json:"code"`
+		Message string `json:"message"`
+	} `json:"error"`
 }
 
 // --- Agent types ---
@@ -53,6 +62,38 @@ type AgentConfigStatus struct {
 	Synced    int `json:"synced"`
 	NotSynced int `json:"not_synced"`
 	Total     int `json:"total"`
+}
+
+type AddAgentRequest struct {
+	Name string `json:"name"`
+	IP   string `json:"ip,omitempty"`
+}
+
+type AddAgentResult struct {
+	Data struct {
+		ID  string `json:"id"`
+		Key string `json:"key"`
+	} `json:"data"`
+	Error int `json:"error"`
+}
+
+type UpgradeTask struct {
+	Agent  string `json:"agent"`
+	TaskID int    `json:"task_id"`
+}
+
+type TaskStatus struct {
+	TaskID         int    `json:"task_id"`
+	AgentID        string `json:"agent_id"`
+	Node           string `json:"node"`
+	Module         string `json:"module"`
+	Command        string `json:"command"`
+	CreateTime     string `json:"create_time"`
+	LastUpdateTime string `json:"last_update_time"`
+	Status         string `json:"status"`
+	Error          int    `json:"error"`
+	ErrorMessage   string `json:"error_message"`
+	Data           string `json:"data"`
 }
 
 // --- Manager types ---

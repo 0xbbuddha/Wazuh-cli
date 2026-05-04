@@ -3,6 +3,7 @@ package api
 import (
 	"fmt"
 	"net/url"
+	"strings"
 
 	"github.com/0xbbuddha/wazuh-cli/internal/client"
 )
@@ -82,6 +83,53 @@ type Group struct {
 func (a *AgentsAPI) Groups() ([]Group, error) {
 	var resp GroupsAPIResponse
 	if err := a.c.Get("/groups", &resp); err != nil {
+		return nil, err
+	}
+	return resp.Data.AffectedItems, nil
+}
+
+func (a *AgentsAPI) Add(name, ip string) (id, key string, err error) {
+	body := AddAgentRequest{Name: name, IP: ip}
+	if body.IP == "" {
+		body.IP = "any"
+	}
+	var resp AddAgentResult
+	if err := a.c.Post("/agents", body, &resp); err != nil {
+		return "", "", err
+	}
+	return resp.Data.ID, resp.Data.Key, nil
+}
+
+func (a *AgentsAPI) Remove(id string) error {
+	return a.c.Delete("/agents?agents_list="+id, nil)
+}
+
+func (a *AgentsAPI) Upgrade(id, version string) ([]UpgradeTask, error) {
+	type upgradeBody struct {
+		Version string `json:"version,omitempty"`
+	}
+	path := "/agents/upgrade?agents_list=" + id
+	var resp APIResponse[UpgradeTask]
+	if err := a.c.PutDecode(path, upgradeBody{Version: version}, &resp); err != nil {
+		return nil, err
+	}
+	if len(resp.Data.AffectedItems) == 0 && len(resp.Data.FailedItems) > 0 {
+		fi := resp.Data.FailedItems[0]
+		switch fi.Error.Code {
+		case 1703:
+			return nil, fmt.Errorf("already up to date: %s", fi.Error.Message)
+		case 1822:
+			return nil, fmt.Errorf("newer than repo: %s", fi.Error.Message)
+		}
+		return nil, fmt.Errorf("code %d: %s", fi.Error.Code, fi.Error.Message)
+	}
+	return resp.Data.AffectedItems, nil
+}
+
+func (a *AgentsAPI) TasksStatus(agentIDs []string) ([]TaskStatus, error) {
+	params := strings.Join(agentIDs, ",")
+	var resp APIResponse[TaskStatus]
+	if err := a.c.Get("/tasks/status?agents_list="+params+"&module=upgrade_module", &resp); err != nil {
 		return nil, err
 	}
 	return resp.Data.AffectedItems, nil

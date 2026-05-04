@@ -3,6 +3,7 @@ package cmd
 import (
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/fatih/color"
 	"github.com/spf13/cobra"
@@ -143,6 +144,166 @@ func newAgentCmd() *cobra.Command {
 		},
 	}
 
-	cmd.AddCommand(listCmd, getCmd, restartCmd, summaryCmd, groupsCmd)
+	// agent add
+	var agentName, agentIP string
+	addCmd := &cobra.Command{
+		Use:   "add",
+		Short: "Register a new agent",
+		Run: func(cmd *cobra.Command, args []string) {
+			if agentName == "" {
+				die(fmt.Errorf("--name is required"))
+			}
+			a := api.NewAgentsAPI(managerClient)
+			id, key, err := a.Add(agentName, agentIP)
+			if err != nil {
+				die(err)
+			}
+			if output.Format == "json" {
+				output.JSON(map[string]string{"id": id, "name": agentName, "key": key})
+				return
+			}
+			fmt.Printf("Agent registered: %s (ID: %s)\n\n", color.GreenString(agentName), color.GreenString(id))
+			output.Field("Enrollment key", key)
+			fmt.Printf("\n%s\n", color.New(color.Faint).Sprint("Deploy: /var/ossec/bin/agent-auth -m <manager_ip> -A "+agentName))
+		},
+	}
+	addCmd.Flags().StringVar(&agentName, "name", "", "Agent name (required)")
+	addCmd.Flags().StringVar(&agentIP, "ip", "any", "Agent IP or 'any'")
+
+	// agent remove
+	var forceRemove bool
+	removeCmd := &cobra.Command{
+		Use:   "remove <agent_id>",
+		Short: "Remove an agent",
+		Args:  cobra.ExactArgs(1),
+		Run: func(cmd *cobra.Command, args []string) {
+			if !forceRemove {
+				fmt.Printf("Remove agent %s? This cannot be undone. [y/N]: ", color.YellowString(args[0]))
+				var confirm string
+				fmt.Scanln(&confirm)
+				if strings.ToLower(confirm) != "y" {
+					fmt.Println("Aborted.")
+					return
+				}
+			}
+			a := api.NewAgentsAPI(managerClient)
+			if err := a.Remove(args[0]); err != nil {
+				die(err)
+			}
+			fmt.Printf("Agent %s removed.\n", color.GreenString(args[0]))
+		},
+	}
+	removeCmd.Flags().BoolVarP(&forceRemove, "force", "f", false, "Skip confirmation prompt")
+
+	// agent upgrade
+	var upgradeVersion string
+	var noWatch bool
+	upgradeCmd := &cobra.Command{
+		Use:   "upgrade <agent_id>",
+		Short: "Upgrade agent to latest or a specific version",
+		Args:  cobra.ExactArgs(1),
+		Run: func(cmd *cobra.Command, args []string) {
+			a := api.NewAgentsAPI(managerClient)
+			tasks, err := a.Upgrade(args[0], upgradeVersion)
+			if err != nil {
+				msg := err.Error()
+				if strings.HasPrefix(msg, "already up to date") || strings.HasPrefix(msg, "newer than repo") {
+					fmt.Printf("%s agent %s — %s\n",
+						color.YellowString("note:"),
+						color.GreenString(args[0]),
+						msg)
+					return
+				}
+				die(err)
+			}
+			if len(tasks) == 0 {
+				fmt.Println(color.YellowString("warning:") + " no tasks returned by the API")
+				return
+			}
+
+			target := upgradeVersion
+			if target == "" {
+				target = "latest"
+			}
+			fmt.Printf("Upgrade to %s requested for agent %s\n\n",
+				color.CyanString(target), color.GreenString(args[0]))
+
+			if noWatch {
+				for _, t := range tasks {
+					fmt.Printf("  Task #%d started\n", t.TaskID)
+				}
+				return
+			}
+
+			// Collect agent IDs from upgrade tasks
+			agentIDs := make([]string, len(tasks))
+			for i, t := range tasks {
+				agentIDs[i] = t.Agent
+			}
+
+			// Poll until all tasks reach a terminal state
+			dim := color.New(color.Faint)
+			spinner := []string{"⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"}
+			spin := 0
+			const maxPolls = 120 // 10 minutes max
+			for poll := 0; poll < maxPolls; poll++ {
+				statuses, err := a.TasksStatus(agentIDs)
+				if err != nil {
+					fmt.Printf("\r%s polling tasks: %v\n", color.RedString("error"), err)
+					return
+				}
+
+				// Render current state
+				done := 0
+				failed := 0
+				fmt.Print("\033[H\033[2J") // clear screen
+				fmt.Printf("Upgrade to %s — agent %s\n\n",
+					color.CyanString(target), color.GreenString(args[0]))
+				for _, s := range statuses {
+					var badge string
+					switch s.Status {
+					case "Done":
+						badge = color.GreenString("✓ Done      ")
+						done++
+					case "Failed":
+						badge = color.RedString("✗ Failed    ")
+						failed++
+					case "Cancelled":
+						badge = color.YellowString("⊘ Cancelled ")
+						failed++
+					default:
+						badge = color.YellowString(spinner[spin%len(spinner)]+" "+s.Status)
+					}
+					line := fmt.Sprintf("  Task #%d  %s", s.TaskID, badge)
+					if s.ErrorMessage != "" {
+						line += "  " + dim.Sprint(s.ErrorMessage)
+					} else if s.Data != "" {
+						line += "  " + dim.Sprint(s.Data)
+					}
+					line += dim.Sprintf("  (updated %s)", s.LastUpdateTime)
+					fmt.Println(line)
+				}
+
+				if done+failed == len(statuses) {
+					fmt.Println()
+					if failed > 0 {
+						fmt.Printf("%s upgrade finished with %d failure(s)\n", color.RedString("✗"), failed)
+					} else {
+						fmt.Printf("%s all tasks completed successfully\n", color.GreenString("✓"))
+					}
+					return
+				}
+
+				spin++
+				time.Sleep(5 * time.Second)
+			}
+			fmt.Printf("\n%s polling timed out — check manually: wazuh-cli agent get %s\n",
+				color.YellowString("warning:"), args[0])
+		},
+	}
+	upgradeCmd.Flags().StringVar(&upgradeVersion, "version", "", "Target version (e.g. v4.9.0), default: latest")
+	upgradeCmd.Flags().BoolVar(&noWatch, "no-watch", false, "Fire and forget — do not poll for progress")
+
+	cmd.AddCommand(listCmd, getCmd, restartCmd, summaryCmd, groupsCmd, addCmd, removeCmd, upgradeCmd)
 	return cmd
 }
