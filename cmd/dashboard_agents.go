@@ -2,7 +2,9 @@ package cmd
 
 import (
 	"fmt"
+	"sort"
 	"strings"
+	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
@@ -72,21 +74,37 @@ func agentsLoad() tea.Cmd {
 	}
 }
 
+var agentStatusOrder = map[string]int{
+	"active":          0,
+	"pending":         1,
+	"disconnected":    2,
+	"never_connected": 3,
+}
+
 func (t agentsTab) applyFilter() agentsTab {
-	if t.searchInput == "" {
-		t.filtered = t.all
-		return t
-	}
-	q := strings.ToLower(t.searchInput)
 	var out []api.Agent
-	for _, a := range t.all {
-		if strings.Contains(strings.ToLower(a.Name), q) ||
-			strings.Contains(a.ID, q) ||
-			strings.Contains(strings.ToLower(a.Status), q) ||
-			strings.Contains(strings.ToLower(a.Os.Name), q) {
-			out = append(out, a)
+	if t.searchInput == "" {
+		out = make([]api.Agent, len(t.all))
+		copy(out, t.all)
+	} else {
+		q := strings.ToLower(t.searchInput)
+		for _, a := range t.all {
+			if strings.Contains(strings.ToLower(a.Name), q) ||
+				strings.Contains(a.ID, q) ||
+				strings.Contains(strings.ToLower(a.Status), q) ||
+				strings.Contains(strings.ToLower(a.Os.Name), q) {
+				out = append(out, a)
+			}
 		}
 	}
+	sort.SliceStable(out, func(i, j int) bool {
+		oi := agentStatusOrder[out[i].Status]
+		oj := agentStatusOrder[out[j].Status]
+		if oi != oj {
+			return oi < oj
+		}
+		return out[i].Name < out[j].Name
+	})
 	t.filtered = out
 	return t
 }
@@ -445,8 +463,24 @@ func fmtLastSeen(ts string) string {
 	if ts == "" || ts == "N/A" {
 		return "—"
 	}
-	if len(ts) >= 10 {
-		return ts[:10]
+	t, err := time.Parse(time.RFC3339, ts)
+	if err != nil {
+		if len(ts) >= 10 {
+			return ts[:10]
+		}
+		return ts
 	}
-	return ts
+	d := time.Since(t)
+	switch {
+	case d < time.Minute:
+		return "just now"
+	case d < time.Hour:
+		return fmt.Sprintf("%dm ago", int(d.Minutes()))
+	case d < 24*time.Hour:
+		return fmt.Sprintf("%dh ago", int(d.Hours()))
+	case d < 7*24*time.Hour:
+		return fmt.Sprintf("%dd ago", int(d.Hours()/24))
+	default:
+		return t.Format("2006-01-02")
+	}
 }

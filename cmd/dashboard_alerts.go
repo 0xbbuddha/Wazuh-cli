@@ -256,8 +256,12 @@ func alertDetailModal(a api.Alert) *modalModel {
 		add("Groups", strings.Join(a.Rule.Groups, ", "))
 	}
 	if a.FullLog != "" {
+		log := strings.TrimSpace(a.FullLog)
+		if len(log) > 4096 {
+			log = log[:4096] + "… [truncated]"
+		}
 		lines = append(lines, "", "Full log:")
-		for _, part := range strings.Split(strings.TrimSpace(a.FullLog), "\n") {
+		for _, part := range strings.Split(log, "\n") {
 			lines = append(lines, "  "+part)
 		}
 	}
