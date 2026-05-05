@@ -18,10 +18,11 @@ var (
 	clrDanger   = lipgloss.Color("196") // red
 	clrHigh     = lipgloss.Color("202") // red-orange
 	clrBorder   = lipgloss.Color("240") // panel borders
-	clrDim      = lipgloss.Color("245") // dim text
+	clrDim      = lipgloss.Color("245") // dim text (content area)
+	clrBarText  = lipgloss.Color("252") // text inside header/status bars
 	clrBright   = lipgloss.Color("255") // bright text
-	clrBarBg    = lipgloss.Color("235") // header/footer bg
-	clrTabBg    = lipgloss.Color("233") // tab bar bg
+	clrBarBg    = lipgloss.Color("236") // header/footer bg — darker for contrast
+	clrTabBg    = lipgloss.Color("234") // tab bar bg
 	clrSel      = lipgloss.Color("237") // selected row bg
 	clrInputBg  = lipgloss.Color("236") // search input bg
 
@@ -56,9 +57,11 @@ var tabLabels = [numTabs]string{"Overview", "Discover", "Agents", "Vulns", "SCA"
 
 // ── modal ─────────────────────────────────────────────────────────────────────
 type modalModel struct {
-	title  string
-	lines  []string
-	scroll int
+	title    string
+	lines    []string
+	scroll   int
+	visLines []string // cached word-wrapped lines
+	visMaxW  int      // innerW used when visLines was built
 }
 
 // ── tick ──────────────────────────────────────────────────────────────────────
@@ -260,6 +263,9 @@ func (m dashModel) View() string {
 		content = m.sca.view(m.width, contentH, m.spinFrame)
 	}
 
+	// Force content to exactly contentH lines: truncate if too tall, pad if too short
+	content = fitHeight(content, contentH)
+
 	return strings.Join([]string{
 		m.renderHeader(),
 		m.renderTabBar(),
@@ -351,8 +357,8 @@ func (m dashModel) handleListClick(y int) dashModel {
 // ── header ────────────────────────────────────────────────────────────────────
 func (m dashModel) renderHeader() string {
 	logo := lipgloss.NewStyle().Bold(true).Foreground(clrPrimary).Render("  WAZUH-CLI")
-	clock := dDimStyle.Render(m.now.Format("15:04:05"))
-	right := dDimStyle.Render("Interactive Dashboard  ")
+	clock := lipgloss.NewStyle().Foreground(clrBarText).Render(m.now.Format("15:04:05"))
+	right := lipgloss.NewStyle().Foreground(clrBarText).Render("Interactive Dashboard  ")
 	mid := clock
 	gap1 := (m.width-lipgloss.Width(logo)-lipgloss.Width(mid)-lipgloss.Width(right))/2
 	if gap1 < 1 {
@@ -372,12 +378,16 @@ func (m dashModel) renderTabBar() string {
 	for i, name := range tabLabels {
 		label := fmt.Sprintf("  %d:%s  ", i+1, name)
 		if i == m.activeTab {
-			parts = append(parts, lipgloss.NewStyle().Bold(true).Foreground(clrPrimary).Render(label))
+			parts = append(parts, lipgloss.NewStyle().Bold(true).
+				Foreground(clrPrimary).Background(lipgloss.Color("238")).
+				Render(label))
 		} else {
-			parts = append(parts, dDimStyle.Render(label))
+			parts = append(parts, lipgloss.NewStyle().
+				Foreground(lipgloss.Color("250")).
+				Render(label))
 		}
 		if i < numTabs-1 {
-			parts = append(parts, dDimStyle.Render("│"))
+			parts = append(parts, lipgloss.NewStyle().Foreground(lipgloss.Color("240")).Render("│"))
 		}
 	}
 	return lipgloss.NewStyle().Background(clrTabBg).Width(m.width).Render(strings.Join(parts, ""))
@@ -385,8 +395,9 @@ func (m dashModel) renderTabBar() string {
 
 // ── status bar ────────────────────────────────────────────────────────────────
 func (m dashModel) renderStatusBar() string {
+	barDesc := lipgloss.NewStyle().Foreground(clrBarText)
 	key := func(k, desc string) string {
-		return lipgloss.NewStyle().Bold(true).Foreground(clrPrimary).Render(k) + " " + dDimStyle.Render(desc)
+		return lipgloss.NewStyle().Bold(true).Foreground(clrPrimary).Render(k) + " " + barDesc.Render(desc)
 	}
 	hints := []string{key("1-5", "tabs"), key("Tab", "next"), key("q", "quit")}
 	switch m.activeTab {
@@ -415,37 +426,43 @@ func (m dashModel) renderModalView() string {
 		mW = 40
 	}
 	innerW := mW - 6
-	innerH := m.height*4/5 - 4
+	innerH := m.height*4/5 - 6
 	if innerH < 4 {
 		innerH = 4
 	}
 
-	// Clamp scroll
-	if modal.scroll+innerH > len(modal.lines) {
-		modal.scroll = max(0, len(modal.lines)-innerH)
+	// Build (or reuse) the cached word-wrapped line list
+	if modal.visLines == nil || modal.visMaxW != innerW {
+		modal.visLines = modal.visLines[:0]
+		for _, line := range modal.lines {
+			modal.visLines = append(modal.visLines, wrapModalLine(line, innerW)...)
+		}
+		modal.visMaxW = innerW
+	}
+	visLines := modal.visLines
+
+	// Clamp scroll to visual line count
+	maxScroll := max(0, len(visLines)-innerH)
+	if modal.scroll > maxScroll {
+		modal.scroll = maxScroll
 	}
 	end := modal.scroll + innerH
-	if end > len(modal.lines) {
-		end = len(modal.lines)
+	if end > len(visLines) {
+		end = len(visLines)
 	}
 
 	var sb strings.Builder
-	for _, line := range modal.lines[modal.scroll:end] {
-		for _, wrapped := range wrapModalLine(line, innerW) {
-			sb.WriteString(wrapped + "\n")
-		}
+	for _, line := range visLines[modal.scroll:end] {
+		sb.WriteString(line + "\n")
 	}
 
 	scrollHint := ""
-	if len(modal.lines) > innerH {
+	if len(visLines) > innerH {
 		pct := 0
-		if len(modal.lines) > 0 {
-			pct = (modal.scroll + innerH) * 100 / len(modal.lines)
-			if pct > 100 {
-				pct = 100
-			}
+		if len(visLines) > 0 {
+			pct = min((modal.scroll+innerH)*100/len(visLines), 100)
 		}
-		scrollHint = dDimStyle.Render(fmt.Sprintf(" [%d/%d · %d%%]", modal.scroll+1, len(modal.lines), pct))
+		scrollHint = dDimStyle.Render(fmt.Sprintf("  [%d/%d · %d%%]", modal.scroll+1, len(visLines), pct))
 	}
 
 	box := lipgloss.NewStyle().
@@ -455,7 +472,7 @@ func (m dashModel) renderModalView() string {
 			dTitleStyle.Render("  "+modal.title)+scrollHint+"\n"+
 				dDimStyle.Render(strings.Repeat("─", innerW))+"\n\n"+
 				strings.TrimRight(sb.String(), "\n")+"\n\n"+
-				dDimStyle.Render("esc/q  close    ↑↓/jk  scroll    scroll wheel  ↕"),
+				dDimStyle.Render("esc/q  close    ↑↓ · jk · scroll wheel  scroll"),
 		)
 
 	return lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center, box)
@@ -463,33 +480,67 @@ func (m dashModel) renderModalView() string {
 
 // wrapModalLine word-wraps a line at maxW visible characters.
 // Lines with ANSI codes are truncated; plain text is word-wrapped.
+// All operations are rune-safe.
 func wrapModalLine(line string, maxW int) []string {
+	if maxW < 1 {
+		return []string{line}
+	}
 	visW := lipgloss.Width(line)
 	if visW <= maxW {
 		return []string{line}
 	}
-	// Line has ANSI codes — truncate safely
-	if visW != len([]rune(line)) {
-		runes := []rune(line)
+	runes := []rune(line)
+	// Has ANSI codes — truncate by rune count
+	if visW != len(runes) {
 		if len(runes) > maxW {
 			return []string{string(runes[:maxW])}
 		}
 		return []string{line}
 	}
-	// Plain text — word wrap
+	// Plain text — word wrap by rune
 	var result []string
-	for len(line) > maxW {
+	for len(runes) > maxW {
 		cut := maxW
-		if idx := strings.LastIndex(line[:maxW], " "); idx > 0 {
-			cut = idx
+		for i := maxW - 1; i > 0; i-- {
+			if runes[i] == ' ' {
+				cut = i
+				break
+			}
 		}
-		result = append(result, line[:cut])
-		line = "  " + strings.TrimLeft(line[cut:], " ")
+		result = append(result, string(runes[:cut]))
+		// skip leading spaces on next segment
+		for cut < len(runes) && runes[cut] == ' ' {
+			cut++
+		}
+		runes = runes[cut:]
+		if len(runes) == 0 {
+			break
+		}
 	}
-	if line != "" {
-		result = append(result, line)
+	if len(runes) > 0 {
+		result = append(result, string(runes))
 	}
 	return result
+}
+
+// fitHeight forces s to exactly h lines: truncates if too tall, pads if too short.
+func fitHeight(s string, h int) string {
+	if h <= 0 {
+		return s
+	}
+	lines := strings.Split(s, "\n")
+	// Remove all trailing empty strings produced by trailing \n's
+	for len(lines) > 0 && lines[len(lines)-1] == "" {
+		lines = lines[:len(lines)-1]
+	}
+	if len(lines) > h {
+		lines = lines[:h]
+	} else {
+		for len(lines) < h {
+			lines = append(lines, "")
+		}
+	}
+	return strings.Join(lines, "\n")
 }
 
 // ── shared helpers ────────────────────────────────────────────────────────────
