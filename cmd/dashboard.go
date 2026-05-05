@@ -48,10 +48,11 @@ const (
 	tabDiscover = 1
 	tabAgents   = 2
 	tabVulns    = 3
-	numTabs     = 4
+	tabSCA      = 4
+	numTabs     = 5
 )
 
-var tabLabels = [numTabs]string{"Overview", "Discover", "Agents", "Vulns"}
+var tabLabels = [numTabs]string{"Overview", "Discover", "Agents", "Vulns", "SCA"}
 
 // ── modal ─────────────────────────────────────────────────────────────────────
 type modalModel struct {
@@ -79,9 +80,11 @@ type dashModel struct {
 	discover      discoverTab
 	agents        agentsTab
 	vulns         vulnsTab
+	sca           scaTab
 	modal         *modalModel
 	refreshSecs   int
 	spinFrame     int
+	now           time.Time
 }
 
 func newDashModel(refreshSecs int) dashModel {
@@ -91,6 +94,8 @@ func newDashModel(refreshSecs int) dashModel {
 		discover:    newDiscoverTab(),
 		agents:      newAgentsTab(),
 		vulns:       newVulnsTab(),
+		sca:         newScaTab(),
+		now:         time.Now(),
 	}
 }
 
@@ -107,9 +112,9 @@ func (m dashModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case dashTickMsg:
 		m.spinFrame = msg.frame
+		m.now = time.Now()
 		var cmds []tea.Cmd
 		cmds = append(cmds, dashTick(msg.frame))
-		// Always propagate tick to overview for auto-refresh
 		var cmd tea.Cmd
 		m.overview, _, cmd = m.overview.update(msg, m.width, m.height)
 		if cmd != nil {
@@ -138,6 +143,8 @@ func (m dashModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m.switchTab(tabAgents)
 		case "4":
 			return m.switchTab(tabVulns)
+		case "5":
+			return m.switchTab(tabSCA)
 		case "tab":
 			return m.switchTab((m.activeTab + 1) % numTabs)
 		case "shift+tab":
@@ -168,6 +175,8 @@ func (m dashModel) tabIsCapturingInput() bool {
 		return m.discover.searchMode
 	case tabAgents:
 		return m.agents.searchMode || m.agents.arSt != arNone
+	case tabSCA:
+		return m.sca.searchMode
 	}
 	return false
 }
@@ -190,6 +199,11 @@ func (m dashModel) switchTab(tab int) (dashModel, tea.Cmd) {
 			m.vulns.loading = true
 			return m, vulnsLoad(m.vulns)
 		}
+	case tabSCA:
+		if !m.sca.agentsLoaded {
+			m.sca.agentsLoading = true
+			return m, scaLoadAgents()
+		}
 	}
 	return m, nil
 }
@@ -206,6 +220,8 @@ func (m dashModel) routeToActiveTab(msg tea.Msg) (dashModel, tea.Cmd) {
 		m.agents, modal, cmd = m.agents.update(msg, m.width, m.height)
 	case tabVulns:
 		m.vulns, modal, cmd = m.vulns.update(msg, m.width, m.height)
+	case tabSCA:
+		m.sca, modal, cmd = m.sca.update(msg, m.width, m.height)
 	}
 	if modal != nil {
 		m.modal = modal
@@ -237,6 +253,8 @@ func (m dashModel) View() string {
 		content = m.agents.view(m.width, contentH, m.spinFrame)
 	case tabVulns:
 		content = m.vulns.view(m.width, contentH, m.spinFrame)
+	case tabSCA:
+		content = m.sca.view(m.width, contentH, m.spinFrame)
 	}
 
 	return strings.Join([]string{
@@ -250,13 +268,19 @@ func (m dashModel) View() string {
 // ── header ────────────────────────────────────────────────────────────────────
 func (m dashModel) renderHeader() string {
 	logo := lipgloss.NewStyle().Bold(true).Foreground(clrPrimary).Render("  WAZUH-CLI")
+	clock := dDimStyle.Render(m.now.Format("15:04:05"))
 	right := dDimStyle.Render("Interactive Dashboard  ")
-	gap := m.width - lipgloss.Width(logo) - lipgloss.Width(right)
-	if gap < 0 {
-		gap = 0
+	mid := clock
+	gap1 := (m.width-lipgloss.Width(logo)-lipgloss.Width(mid)-lipgloss.Width(right))/2
+	if gap1 < 1 {
+		gap1 = 1
+	}
+	gap2 := m.width - lipgloss.Width(logo) - gap1 - lipgloss.Width(mid) - lipgloss.Width(right)
+	if gap2 < 1 {
+		gap2 = 1
 	}
 	return lipgloss.NewStyle().Background(clrBarBg).Width(m.width).
-		Render(logo + strings.Repeat(" ", gap) + right)
+		Render(logo + strings.Repeat(" ", gap1) + mid + strings.Repeat(" ", gap2) + right)
 }
 
 // ── tab bar ───────────────────────────────────────────────────────────────────
@@ -281,16 +305,18 @@ func (m dashModel) renderStatusBar() string {
 	key := func(k, desc string) string {
 		return lipgloss.NewStyle().Bold(true).Foreground(clrPrimary).Render(k) + " " + dDimStyle.Render(desc)
 	}
-	hints := []string{key("1-4", "tabs"), key("Tab", "next"), key("q", "quit")}
+	hints := []string{key("1-5", "tabs"), key("Tab", "next"), key("q", "quit")}
 	switch m.activeTab {
 	case tabDiscover:
 		hints = append(hints, key("/", "search"), key("f", "level"), key("↑↓", "nav"), key("Enter", "detail"), key("r", "refresh"))
 	case tabAgents:
-		hints = append(hints, key("/", "filter"), key("↑↓", "nav"), key("Enter", "detail"), key("a", "active-response"), key("r", "refresh"))
+		hints = append(hints, key("/", "filter"), key("↑↓", "nav"), key("Enter", "detail"), key("a", "AR"), key("r", "refresh"))
 	case tabVulns:
 		hints = append(hints, key("f", "severity"), key("↑↓", "nav"), key("Enter", "detail"), key("r", "refresh"))
 	case tabOverview:
 		hints = append(hints, key("r", "refresh"))
+	case tabSCA:
+		hints = append(hints, key("/", "filter"), key("↑↓", "nav"), key("Enter", "select"), key("Esc", "back"), key("r", "refresh"))
 	}
 	return lipgloss.NewStyle().Background(clrBarBg).Width(m.width).Render("  " + strings.Join(hints, "   "))
 }

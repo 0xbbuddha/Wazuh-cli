@@ -142,7 +142,12 @@ func (t overviewTab) renderCards(width int, d *overviewDataMsg) string {
 	c1 := metricCard(cw, "ACTIVE AGENTS", dashFmt(active), "online", activeBorder, clrSuccess)
 	c2 := metricCard(cw, "ALERTS 24H", dashFmt(total24h), "events", clrBorder, clrWarn)
 	c3 := metricCard(cw, "CRITICAL VULNS", dashFmt(crit), "CVEs", critBorder, clrDanger)
-	c4 := metricCard(cw, "TOTAL AGENTS", dashFmt(total), "registered", clrBorder, clrBright)
+	var c4 string
+	if disconn > 0 {
+		c4 = metricCard(cw, "DISCONNECTED", dashFmt(disconn), "agents down", clrDanger, clrDanger)
+	} else {
+		c4 = metricCard(cw, "TOTAL AGENTS", dashFmt(total), "registered", clrBorder, clrBright)
+	}
 	return lipgloss.JoinHorizontal(lipgloss.Top, c1, "  ", c2, "  ", c3, "  ", c4)
 }
 
