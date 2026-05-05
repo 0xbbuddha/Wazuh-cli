@@ -247,6 +247,45 @@ type Vulnerability struct {
 	Type         string `json:"type"`
 }
 
+// --- Logtest types ---
+
+type LogtestRequest struct {
+	Event     string `json:"event"`
+	LogFormat string `json:"log_format"`
+	Location  string `json:"location"`
+	Token     string `json:"token,omitempty"`
+}
+
+type LogtestResult struct {
+	Token    string         `json:"token"`
+	Messages []string       `json:"messages"`
+	Output   *LogtestOutput `json:"output"`
+	CodemMsg int            `json:"codemsg"`
+}
+
+type LogtestOutput struct {
+	Timestamp string            `json:"timestamp"`
+	Rule      *LogtestRule      `json:"rule"`
+	Decoder   *LogtestDecoder   `json:"decoder"`
+	Data      map[string]any    `json:"data"`
+	FullLog   string            `json:"full_log"`
+	Location  string            `json:"location"`
+}
+
+type LogtestRule struct {
+	Level       int      `json:"level"`
+	Description string   `json:"description"`
+	ID          string   `json:"id"`
+	Groups      []string `json:"groups"`
+	FiredTimes  int      `json:"firedtimes"`
+	Mail        bool     `json:"mail"`
+}
+
+type LogtestDecoder struct {
+	Name   string `json:"name"`
+	Parent string `json:"parent"`
+}
+
 // --- Cluster types ---
 
 type ClusterStatus struct {

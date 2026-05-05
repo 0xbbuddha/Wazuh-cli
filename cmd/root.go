@@ -173,6 +173,8 @@ func init() {
 		newConfigCmd(),
 		newDashboardCmd(),
 		newARCmd(),
+		newGroupsCmd(),
+		newLogtestCmd(),
 	)
 
 	// Custom help for all commands — shows banner only for root
