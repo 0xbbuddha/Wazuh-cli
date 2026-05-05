@@ -122,6 +122,9 @@ func (m dashModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		return m, tea.Batch(cmds...)
 
+	case tea.MouseMsg:
+		return m.handleMouse(msg)
+
 	case tea.KeyMsg:
 		if m.modal != nil {
 			return m.handleModalKey(msg)
@@ -265,6 +268,86 @@ func (m dashModel) View() string {
 	}, "\n")
 }
 
+// ── mouse ─────────────────────────────────────────────────────────────────────
+func (m dashModel) handleMouse(msg tea.MouseMsg) (dashModel, tea.Cmd) {
+	switch {
+	case msg.Button == tea.MouseButtonWheelUp && msg.Action == tea.MouseActionPress:
+		if m.modal != nil {
+			if m.modal.scroll > 0 {
+				m.modal.scroll--
+			}
+			return m, nil
+		}
+		return m.routeToActiveTab(tea.KeyMsg{Type: tea.KeyUp})
+
+	case msg.Button == tea.MouseButtonWheelDown && msg.Action == tea.MouseActionPress:
+		if m.modal != nil {
+			m.modal.scroll++
+			return m, nil
+		}
+		return m.routeToActiveTab(tea.KeyMsg{Type: tea.KeyDown})
+
+	case msg.Button == tea.MouseButtonLeft && msg.Action == tea.MouseActionPress:
+		if m.modal != nil {
+			return m, nil
+		}
+		if msg.Y == 1 {
+			return m.handleTabBarClick(msg.X)
+		}
+		if msg.Y >= 6 {
+			m = m.handleListClick(msg.Y)
+		}
+	}
+	return m, nil
+}
+
+func (m dashModel) handleTabBarClick(x int) (dashModel, tea.Cmd) {
+	pos := 0
+	for i, name := range tabLabels {
+		label := fmt.Sprintf("  %d:%s  ", i+1, name)
+		w := len([]rune(label))
+		if x >= pos && x < pos+w {
+			return m.switchTab(i)
+		}
+		pos += w + 1 // +1 for │ separator
+	}
+	return m, nil
+}
+
+// handleListClick maps a Y click position to a cursor row.
+// Content starts at Y=2 (header+tabbar), list rows start at Y=6 (4 header lines per tab).
+func (m dashModel) handleListClick(y int) dashModel {
+	row := y - 6
+	if row < 0 {
+		return m
+	}
+	switch m.activeTab {
+	case tabDiscover:
+		target := m.discover.offset + row
+		if target < len(m.discover.alerts) {
+			m.discover.cursor = target
+		}
+	case tabAgents:
+		target := m.agents.offset + row
+		if target < len(m.agents.filtered) {
+			m.agents.cursor = target
+		}
+	case tabVulns:
+		target := m.vulns.offset + row
+		if target < len(m.vulns.vulns) {
+			m.vulns.cursor = target
+		}
+	case tabSCA:
+		target := m.sca.offset + row
+		if m.sca.state == scaViewAgents && target < len(m.sca.agentsFilt) {
+			m.sca.cursor = target
+		} else if m.sca.state == scaViewPolicies && target < len(m.sca.policies) {
+			m.sca.cursor = target
+		}
+	}
+	return m
+}
+
 // ── header ────────────────────────────────────────────────────────────────────
 func (m dashModel) renderHeader() string {
 	logo := lipgloss.NewStyle().Bold(true).Foreground(clrPrimary).Render("  WAZUH-CLI")
@@ -324,15 +407,15 @@ func (m dashModel) renderStatusBar() string {
 // ── modal view ────────────────────────────────────────────────────────────────
 func (m dashModel) renderModalView() string {
 	modal := m.modal
-	mW := m.width * 3 / 4
-	if mW > 120 {
-		mW = 120
+	mW := m.width * 9 / 10
+	if mW > 180 {
+		mW = 180
 	}
 	if mW < 40 {
 		mW = 40
 	}
 	innerW := mW - 6
-	innerH := m.height*2/3 - 8
+	innerH := m.height*4/5 - 4
 	if innerH < 4 {
 		innerH = 4
 	}
@@ -348,18 +431,21 @@ func (m dashModel) renderModalView() string {
 
 	var sb strings.Builder
 	for _, line := range modal.lines[modal.scroll:end] {
-		if lipgloss.Width(line) > innerW {
-			runes := []rune(line)
-			if len(runes) > innerW {
-				line = string(runes[:innerW])
-			}
+		for _, wrapped := range wrapModalLine(line, innerW) {
+			sb.WriteString(wrapped + "\n")
 		}
-		sb.WriteString(line + "\n")
 	}
 
 	scrollHint := ""
 	if len(modal.lines) > innerH {
-		scrollHint = dDimStyle.Render(fmt.Sprintf(" [%d/%d]", modal.scroll+1, len(modal.lines)))
+		pct := 0
+		if len(modal.lines) > 0 {
+			pct = (modal.scroll + innerH) * 100 / len(modal.lines)
+			if pct > 100 {
+				pct = 100
+			}
+		}
+		scrollHint = dDimStyle.Render(fmt.Sprintf(" [%d/%d · %d%%]", modal.scroll+1, len(modal.lines), pct))
 	}
 
 	box := lipgloss.NewStyle().
@@ -369,10 +455,41 @@ func (m dashModel) renderModalView() string {
 			dTitleStyle.Render("  "+modal.title)+scrollHint+"\n"+
 				dDimStyle.Render(strings.Repeat("─", innerW))+"\n\n"+
 				strings.TrimRight(sb.String(), "\n")+"\n\n"+
-				dDimStyle.Render("esc · q  close    ↑↓ · jk  scroll"),
+				dDimStyle.Render("esc/q  close    ↑↓/jk  scroll    scroll wheel  ↕"),
 		)
 
 	return lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center, box)
+}
+
+// wrapModalLine word-wraps a line at maxW visible characters.
+// Lines with ANSI codes are truncated; plain text is word-wrapped.
+func wrapModalLine(line string, maxW int) []string {
+	visW := lipgloss.Width(line)
+	if visW <= maxW {
+		return []string{line}
+	}
+	// Line has ANSI codes — truncate safely
+	if visW != len([]rune(line)) {
+		runes := []rune(line)
+		if len(runes) > maxW {
+			return []string{string(runes[:maxW])}
+		}
+		return []string{line}
+	}
+	// Plain text — word wrap
+	var result []string
+	for len(line) > maxW {
+		cut := maxW
+		if idx := strings.LastIndex(line[:maxW], " "); idx > 0 {
+			cut = idx
+		}
+		result = append(result, line[:cut])
+		line = "  " + strings.TrimLeft(line[cut:], " ")
+	}
+	if line != "" {
+		result = append(result, line)
+	}
+	return result
 }
 
 // ── shared helpers ────────────────────────────────────────────────────────────
@@ -407,7 +524,7 @@ func newDashboardCmd() *cobra.Command {
 		Short:   "Interactive TUI dashboard (agents, alerts, vulnerabilities)",
 		Aliases: []string{"dash"},
 		Run: func(cmd *cobra.Command, args []string) {
-			p := tea.NewProgram(newDashModel(refreshSecs), tea.WithAltScreen())
+			p := tea.NewProgram(newDashModel(refreshSecs), tea.WithAltScreen(), tea.WithMouseCellMotion())
 			if _, err := p.Run(); err != nil {
 				die(err)
 			}
