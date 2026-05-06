@@ -1,6 +1,6 @@
 # wazuh-cli
 
-Command-line interface for the **Wazuh REST API** (v4.x), written in Go.
+Interactive REPL for the **Wazuh REST API** (v4.x), written in Go.
 
 ```
   ██╗    ██╗ █████╗ ███████╗██╗   ██╗██╗  ██╗    ██████╗██╗     ██╗
@@ -15,14 +15,15 @@ Command-line interface for the **Wazuh REST API** (v4.x), written in Go.
 
 ## Features
 
+- Interactive REPL shell with tab completion and persistent history
 - JWT authentication with automatic token refresh and disk cache
 - Colored output: status badges, severity indicators, alert levels
 - Progress bars for SCA scores `[████████████░░░░░░░░] 60%`
 - Sparklines for alert trends `▁▂▃▄▅▆▇█`
-- Severity badges `[CRITICAL]` `[HIGH]` `[MEDIUM]` `[LOW]`
-- Live TUI dashboard (`wazuh-cli dashboard`)
+- Live TUI dashboard (`dashboard`)
 - `--watch` mode for real-time alert monitoring
-- `--output json` on every command for scripting
+- `-o json` on every command for scripting
+- Shell passthrough with `!<command>` (e.g. `!ping 1.2.3.4`)
 - Covers the **Wazuh Manager API** (port 55000) and **Wazuh Indexer / OpenSearch** (port 9200)
 
 ---
@@ -48,13 +49,14 @@ make build
 
 ## Configuration
 
-Run the interactive wizard to generate `~/.config/wazuh-cli/config.toml`:
+Launch the REPL and run the interactive wizard:
 
-```bash
-wazuh-cli config init
+```
+wazuh-cli
+wazuh > config init
 ```
 
-Or create the file manually:
+Or create `~/.config/wazuh-cli/config.toml` manually:
 
 ```toml
 api_url  = "https://wazuh-manager:55000"
@@ -77,107 +79,82 @@ password = "kibanaserver"
 
 ## Usage
 
+```bash
+wazuh-cli              # launch the REPL
+wazuh-cli --server https://wazuh:55000 --user wazuh-wui --password secret
 ```
-wazuh-cli [command] [subcommand] [flags]
 
-Global flags:
-  -o, --output string   Output format: table or json (default "table")
+Once inside the REPL:
+
 ```
+wazuh (wazuh-wui@wazuh.example.com) > help
+```
+
+### REPL tips
+
+| Input | Action |
+|---|---|
+| `Tab` | Autocomplete commands and subcommands |
+| `↑ / ↓` | Navigate command history |
+| `!<cmd>` | Run a shell command (`!ping 1.2.3.4`, `!cat /etc/hosts`) |
+| `-o json` | Append to any command for JSON output |
+| `clear` | Clear the terminal |
+| `exit` / `quit` / `Ctrl+D` | Leave the REPL |
+
+---
+
+## Commands
 
 ### agent
 
-```bash
-wazuh-cli agent list                          # list all agents
-wazuh-cli agent list --status active          # filter by status
-wazuh-cli agent list --group default          # filter by group
-wazuh-cli agent get 001                       # detailed info for agent 001
-wazuh-cli agent restart 001                   # restart agent 001
-wazuh-cli agent summary                       # connection status counts
-wazuh-cli agent groups                        # list agent groups
+```
+agent list                          # list all agents
+agent list --status active          # filter by status
+agent list --group default          # filter by group
+agent get 001                       # detailed info for agent 001
+agent restart 001                   # restart agent 001
+agent summary                       # connection & config-sync counts
+agent add --name web01 --ip 10.0.0.5
+agent remove 001                    # remove agent (asks confirmation)
+agent upgrade 001
+agent groups                        # list agent groups
+```
+
+### groups
+
+```
+groups list
+groups agents default               # agents in a group
+groups create my-group
+groups delete my-group
+groups assign 001 my-group
+groups unassign 001 my-group
+groups config my-group              # show agent.conf for the group
+groups config-edit my-group         # edit agent.conf in $EDITOR and upload on save
 ```
 
 ### manager
 
-```bash
-wazuh-cli manager info                        # version, type, path
-wazuh-cli manager status                      # status of all Wazuh daemons
-wazuh-cli manager logs                        # last 20 log entries
-wazuh-cli manager logs --lines 50
 ```
-
-### syscollector
-
-```bash
-wazuh-cli syscollector hardware  001
-wazuh-cli syscollector os        001
-wazuh-cli syscollector packages  001
-wazuh-cli syscollector packages  001 --search nginx
-wazuh-cli syscollector ports     001
-wazuh-cli syscollector processes 001
-wazuh-cli syscollector netaddr   001
-```
-
-### rules
-
-```bash
-wazuh-cli rules list
-wazuh-cli rules list --level 10
-wazuh-cli rules list --group sshd
-```
-
-### sca
-
-SCA scores are displayed with a color-coded progress bar.
-
-```bash
-wazuh-cli sca list 001
-wazuh-cli sca checks 001 cis_ubuntu22-04
-```
-
-```
-POLICY           NAME                  PASS  FAIL  SCORE                      LAST SCAN
-cis_ubuntu22-04  CIS Ubuntu 22.04 L1   143   21    [████████████░░░░░░░░]  60%  2026-04-30
-```
-
-### vuln
-
-> Requires `[indexer]` section in config.toml for Wazuh 4.8+.
-
-```bash
-wazuh-cli vuln list 001
-wazuh-cli vuln list 001 --severity critical
-wazuh-cli vuln list 001 --severity high
-wazuh-cli vuln summary 001
-```
-
-```
-CVE             SEVERITY    SCORE  PACKAGE    VERSION
-CVE-2024-3094   [CRITICAL]  9.8    xz-utils   5.4.1
-CVE-2023-4911   [HIGH]      7.8    glibc      2.35
-```
-
-### cluster
-
-```bash
-wazuh-cli cluster status
-wazuh-cli cluster nodes
-wazuh-cli cluster health
-wazuh-cli cluster indexer   # OpenSearch cluster health (port 9200)
+manager info                        # version, type, path
+manager status                      # status of all Wazuh daemons
+manager logs                        # last 20 log entries
+manager logs --lines 50
 ```
 
 ### alerts
 
 > Requires `[indexer]` section in config.toml.
 
-```bash
-wazuh-cli alerts list
-wazuh-cli alerts list --limit 100 --level 8
-wazuh-cli alerts list --agent 001
-wazuh-cli alerts list --watch                 # real-time refresh
-wazuh-cli alerts list --watch --interval 10
-wazuh-cli alerts search "failed password"
-wazuh-cli alerts heatmap                      # 7-day x 24-hour volume grid
-wazuh-cli alerts heatmap --agent 001
+```
+alerts list
+alerts list --limit 100 --level 8
+alerts list --agent 001
+alerts list --watch                 # real-time refresh
+alerts list --watch --interval 10
+alerts search "failed password"
+alerts heatmap                      # 7-day x 24-hour volume grid
+alerts heatmap --agent 001
 ```
 
 The heatmap shows alert volume per hour over the last 7 days with adaptive color thresholds:
@@ -192,47 +169,117 @@ Tue 04/29   ·········░░░▒▒▓▓▓███▓▒▒░··�
   · no alerts   ░ low   ▒ medium   ▓ high   █ peak
 ```
 
+### rules
+
+```
+rules list
+rules list --level 10
+rules list --group sshd
+rules get 5710
+rules groups
+```
+
+### sca
+
+SCA scores are displayed with a color-coded progress bar.
+
+```
+sca list 001
+sca checks 001 cis_ubuntu22-04
+```
+
+```
+POLICY           NAME                  PASS  FAIL  SCORE                      LAST SCAN
+cis_ubuntu22-04  CIS Ubuntu 22.04 L1   143   21    [████████████░░░░░░░░]  60%  2026-04-30
+```
+
+### vuln
+
+> Requires `[indexer]` section in config.toml (Wazuh 4.8+).
+
+```
+vuln list 001
+vuln list 001 --severity critical
+vuln list 001 --severity high
+vuln summary 001
+```
+
+```
+CVE             SEVERITY    SCORE  PACKAGE    VERSION
+CVE-2024-3094   [CRITICAL]  9.8    xz-utils   5.4.1
+CVE-2023-4911   [HIGH]      7.8    glibc      2.35
+```
+
+### syscollector
+
+```
+syscollector hardware  001
+syscollector os        001
+syscollector packages  001
+syscollector packages  001 --search nginx
+syscollector ports     001
+syscollector processes 001
+syscollector netaddr   001
+```
+
+### cluster
+
+```
+cluster status
+cluster nodes
+cluster health
+cluster indexer                     # OpenSearch cluster health (port 9200)
+```
+
 ### ar (active response)
 
-> Requires active response to be configured in `/var/ossec/etc/ossec.conf` on the manager.
+```
+ar list                             # show available actions
+ar run 001 restart
+ar run 001 block-ip 1.2.3.4
+ar run all block-ip 1.2.3.4         # run on all agents (asks confirmation)
+ar run all block-ip 1.2.3.4 -f     # skip confirmation
+```
 
-```bash
-wazuh-cli ar list                             # show available actions
-wazuh-cli ar run 001 restart                  # restart Wazuh agent
-wazuh-cli ar run 001 block-ip 1.2.3.4         # block an IP via iptables
-wazuh-cli ar run 001 unblock-ip 1.2.3.4       # remove IP block
-wazuh-cli ar run 001 host-deny 1.2.3.4        # add to /etc/hosts.deny
-wazuh-cli ar run all block-ip 1.2.3.4         # run on all agents (asks confirmation)
-wazuh-cli ar run all block-ip 1.2.3.4 --force # skip confirmation
+### logtest
+
+Test log lines against the Wazuh rules engine.
+
+```
+logtest                             # interactive mode
+logtest "May  6 12:00:01 host sshd[1234]: Failed password for root"
+logtest -f /tmp/sample.log          # test all lines in a file
 ```
 
 ### dashboard
 
 Live TUI dashboard showing agents, alert trend, vulnerabilities and recent alerts.
 
-```bash
-wazuh-cli dashboard                           # auto-refresh every 30s
-wazuh-cli dashboard --refresh 60
-wazuh-cli dashboard --refresh 0              # disable auto-refresh
+```
+dashboard                           # auto-refresh every 30s
+dashboard --refresh 60
+dashboard --refresh 0              # disable auto-refresh
 ```
 
 Controls: `r` to refresh manually, `q` to quit.
 
 ### config
 
-```bash
-wazuh-cli config           # show active configuration
-wazuh-cli config init      # interactive setup wizard
+```
+config show                         # display active configuration
+config init                         # interactive setup wizard
 ```
 
-### JSON output
+---
 
-All commands support `--output json` for piping or scripting:
+## JSON output
 
-```bash
-wazuh-cli agent list -o json | jq '.[] | select(.status == "disconnected")'
-wazuh-cli vuln list 001 --severity critical -o json | jq '.[].cve'
-wazuh-cli alerts list -o json | jq '.[].rule.description'
+Append `-o json` to any command for raw JSON output:
+
+```
+alerts list -o json | jq '.[].rule.description'
+vuln list 001 --severity critical -o json | jq '.[].cve'
+agent list -o json | jq '.[] | select(.status == "disconnected")'
 ```
 
 ---
@@ -241,17 +288,19 @@ wazuh-cli alerts list -o json | jq '.[].rule.description'
 
 | Command | Subcommands |
 |---|---|
-| `agent` | `list`, `get`, `restart`, `summary`, `groups` |
+| `agent` | `list`, `get`, `restart`, `summary`, `add`, `remove`, `upgrade`, `groups` |
+| `groups` | `list`, `agents`, `create`, `delete`, `assign`, `unassign`, `config`, `config-edit` |
 | `manager` | `info`, `status`, `logs` |
-| `syscollector` | `hardware`, `os`, `packages`, `ports`, `processes`, `netaddr` |
-| `rules` | `list` |
+| `alerts` | `list`, `search`, `heatmap` |
+| `rules` | `list`, `get`, `groups` |
 | `sca` | `list`, `checks` |
 | `vuln` | `list`, `summary` |
+| `syscollector` | `hardware`, `os`, `packages`, `ports`, `processes`, `netaddr` |
 | `cluster` | `status`, `nodes`, `health`, `indexer` |
-| `alerts` | `list`, `search`, `heatmap` |
 | `ar` | `list`, `run` |
+| `logtest` | _(interactive or inline)_ |
 | `dashboard` | |
-| `config` | `init` |
+| `config` | `show`, `init` |
 
 ---
 
