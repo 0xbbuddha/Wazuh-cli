@@ -91,10 +91,7 @@ func configInit() {
 	fmt.Printf("Config path: %s\n", brandDim.Sprint(cfgPath))
 
 	if _, err := os.Stat(cfgPath); err == nil {
-		fmt.Print(color.YellowString("File already exists. Overwrite? [y/N] "))
-		var answer string
-		fmt.Scanln(&answer)
-		if strings.ToLower(strings.TrimSpace(answer)) != "y" {
+		if !promptConfirm(color.YellowString("File already exists. Overwrite?")) {
 			fmt.Println("Aborted.")
 			return
 		}

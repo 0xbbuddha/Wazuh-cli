@@ -32,6 +32,7 @@ func init() {
 		"syscollector": {"System inventory for an agent", handleSyscollector},
 		"vuln":         {"Vulnerability detection results", handleVuln},
 		"help":         {"Show available commands", handleHelp},
+		"version":      {"Print version", func(_ []string) { fmt.Printf("wazuh-cli %s\n", cliVersion) }},
 		"clear":        {"Clear the terminal screen", func(_ []string) { fmt.Print("\033[2J\033[3J\033[H") }},
 	}
 }

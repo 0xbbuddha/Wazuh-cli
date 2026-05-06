@@ -202,10 +202,7 @@ func agentRemove(args []string) {
 	}
 	agentID := rest[0]
 	if !*force {
-		fmt.Printf("Remove agent %s? This cannot be undone. [y/N]: ", color.YellowString(agentID))
-		var confirm string
-		fmt.Scanln(&confirm)
-		if strings.ToLower(confirm) != "y" {
+		if !promptConfirm(fmt.Sprintf("Remove agent %s? This cannot be undone.", color.YellowString(agentID))) {
 			fmt.Println("Aborted.")
 			return
 		}

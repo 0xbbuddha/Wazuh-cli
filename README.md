@@ -43,7 +43,7 @@ make build
 # binaries in build/linux-amd64/ and build/darwin-amd64/
 ```
 
-**Requirements:** Go 1.21+
+**Requirements:** Go 1.22+
 
 ---
 

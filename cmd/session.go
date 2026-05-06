@@ -1,8 +1,10 @@
 package cmd
 
 import (
+	"bufio"
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/fatih/color"
 
@@ -57,6 +59,18 @@ func printWarn(msg string) {
 
 func printSection(title string) {
 	fmt.Printf("\n\033[38;5;33m\033[1m%s\033[0m\n", title)
+}
+
+// promptConfirm prints a [y/N] prompt and returns true only if the user types "y".
+// Returns false immediately if stdin is not a terminal (non-interactive mode).
+func promptConfirm(question string) bool {
+	fmt.Print(question + " [y/N] ")
+	scanner := bufio.NewScanner(os.Stdin)
+	if !scanner.Scan() {
+		fmt.Println()
+		return false
+	}
+	return strings.ToLower(strings.TrimSpace(scanner.Text())) == "y"
 }
 
 func printUnknownSub(cmd, sub string) {

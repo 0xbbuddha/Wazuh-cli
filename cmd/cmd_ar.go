@@ -3,7 +3,6 @@ package cmd
 import (
 	"flag"
 	"fmt"
-	"strings"
 
 	"github.com/fatih/color"
 
@@ -94,10 +93,7 @@ func arRun(args []string) {
 
 	if agentID == "all" && !*force {
 		fmt.Printf("%s This will run %q on ALL agents.\n", color.YellowString("[!]"), actionName)
-		fmt.Print("Continue? [y/N] ")
-		var answer string
-		fmt.Scanln(&answer)
-		if strings.ToLower(strings.TrimSpace(answer)) != "y" {
+		if !promptConfirm("Continue?") {
 			fmt.Println("Aborted.")
 			return
 		}

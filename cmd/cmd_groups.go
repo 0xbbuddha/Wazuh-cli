@@ -129,10 +129,7 @@ func groupsDelete(args []string) {
 		return
 	}
 	if !*force {
-		fmt.Printf("Delete group %q? [y/N] ", groupName)
-		var ans string
-		fmt.Scanln(&ans)
-		if strings.ToLower(ans) != "y" {
+		if !promptConfirm(fmt.Sprintf("Delete group %q?", groupName)) {
 			fmt.Println("Aborted.")
 			return
 		}

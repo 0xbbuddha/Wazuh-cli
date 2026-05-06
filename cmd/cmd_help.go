@@ -8,8 +8,9 @@ import (
 )
 
 var generalCmds = map[string]struct{}{
-	"help":  {},
-	"clear": {},
+	"help":    {},
+	"clear":   {},
+	"version": {},
 }
 
 func handleHelp(args []string) {
@@ -38,6 +39,7 @@ func handleHelp(args []string) {
 	fmt.Printf("  %s\n\n", wazuhBlue("GENERAL"))
 	fmt.Printf("    \033[38;5;33m%-16s\033[0m  %s\n", "!<cmd>", "Run a shell command  (!ping 1.2.3.4, !cat /etc/hosts)")
 	fmt.Printf("    \033[38;5;33m%-16s\033[0m  %s\n", "help [command]", "Show this help or subcommands for a command")
+	fmt.Printf("    \033[38;5;33m%-16s\033[0m  %s\n", "version", "Print current version")
 	fmt.Printf("    \033[38;5;33m%-16s\033[0m  %s\n", "clear", "Clear the terminal screen")
 	fmt.Printf("    \033[38;5;33m%-16s\033[0m  %s\n", "exit / quit", "Leave the REPL")
 

@@ -49,6 +49,10 @@ func alertsList(args []string) {
 	}
 	output.Format = *outFmt
 	if *watch {
+		if output.Format == "json" {
+			printErr(fmt.Errorf("--watch is not compatible with -o json"))
+			return
+		}
 		alertsWatch(*limit, *level, *agentID, *interval)
 		return
 	}
