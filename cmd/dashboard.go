@@ -7,7 +7,6 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
-	"github.com/spf13/cobra"
 )
 
 // ── palette ───────────────────────────────────────────────────────────────────
@@ -567,20 +566,3 @@ func renderLoading(w, h, frame int) string {
 		dDimStyle.Render(dashSpinChars[frame]+" Loading..."))
 }
 
-// ── command ───────────────────────────────────────────────────────────────────
-func newDashboardCmd() *cobra.Command {
-	var refreshSecs int
-	cmd := &cobra.Command{
-		Use:     "dashboard",
-		Short:   "Interactive TUI dashboard (agents, alerts, vulnerabilities)",
-		Aliases: []string{"dash"},
-		Run: func(cmd *cobra.Command, args []string) {
-			p := tea.NewProgram(newDashModel(refreshSecs), tea.WithAltScreen(), tea.WithMouseCellMotion())
-			if _, err := p.Run(); err != nil {
-				die(err)
-			}
-		},
-	}
-	cmd.Flags().IntVar(&refreshSecs, "refresh", 30, "Auto-refresh interval in seconds (0 to disable)")
-	return cmd
-}

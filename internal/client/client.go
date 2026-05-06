@@ -229,6 +229,46 @@ func (c *Client) Post(path string, payload any, dst any) error {
 	return nil
 }
 
+// GetRaw fetches a path and returns the raw response body (no JSON decoding).
+func (c *Client) GetRaw(path string) ([]byte, error) {
+	resp, err := c.Do(http.MethodGet, path, nil)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	b, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("HTTP %d: %s", resp.StatusCode, b)
+	}
+	return b, nil
+}
+
+// PutRaw sends a raw body with the given Content-Type (bypasses JSON encoding).
+func (c *Client) PutRaw(path, contentType string, body []byte) error {
+	if err := c.ensureToken(); err != nil {
+		return err
+	}
+	req, err := http.NewRequest(http.MethodPut, c.baseURL+path, bytes.NewReader(body))
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Authorization", "Bearer "+c.token)
+	req.Header.Set("Content-Type", contentType)
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	b, _ := io.ReadAll(resp.Body)
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("HTTP %d: %s", resp.StatusCode, b)
+	}
+	return nil
+}
+
 // Delete is a helper for DELETE requests that decodes the response into dst.
 func (c *Client) Delete(path string, dst any) error {
 	resp, err := c.Do(http.MethodDelete, path, nil)

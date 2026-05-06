@@ -54,3 +54,19 @@ func (g *GroupsAPI) Unassign(agentID, groupID string) error {
 		url.QueryEscape(agentID), url.QueryEscape(groupID))
 	return g.c.Delete(path, nil)
 }
+
+// GetConfig returns the raw XML content of the group's agent.conf.
+func (g *GroupsAPI) GetConfig(groupID string) (string, error) {
+	path := fmt.Sprintf("/groups/%s/files/agent.conf?raw=true", url.PathEscape(groupID))
+	b, err := g.c.GetRaw(path)
+	if err != nil {
+		return "", err
+	}
+	return string(b), nil
+}
+
+// PutConfig uploads new XML content as the group's agent.conf.
+func (g *GroupsAPI) PutConfig(groupID, xmlContent string) error {
+	path := fmt.Sprintf("/groups/%s/configuration", url.PathEscape(groupID))
+	return g.c.PutRaw(path, "application/xml", []byte(xmlContent))
+}

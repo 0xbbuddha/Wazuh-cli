@@ -14,15 +14,18 @@ import (
 var Format = "table"
 
 var (
-	headerStyle = color.New(color.FgCyan, color.Bold)
-	bold        = color.New(color.Bold)
-	green       = color.New(color.FgGreen)
-	yellow      = color.New(color.FgYellow)
-	red         = color.New(color.FgRed)
-	faint       = color.New(color.Faint)
+	bold   = color.New(color.Bold)
+	green  = color.New(color.FgGreen)
+	yellow = color.New(color.FgYellow)
+	red    = color.New(color.FgRed)
+	faint  = color.New(color.Faint)
 
 	ansiRe = regexp.MustCompile(`\x1b\[[0-9;]*m`)
 )
+
+func wazuhBlueStr(s string) string {
+	return "\033[38;5;33m\033[1m" + s + "\033[0m"
+}
 
 // visibleLen returns the printable width of a string, ignoring ANSI escape codes.
 func visibleLen(s string) int {
@@ -88,7 +91,7 @@ func (t *Table) Flush() {
 	printRow := func(cols []string, isHeader bool) {
 		for i, c := range cols {
 			if isHeader {
-				c = headerStyle.Sprint(c)
+				c = wazuhBlueStr(c)
 			}
 			vl := visibleLen(c)
 			width := t.maxCols[i]
@@ -108,7 +111,17 @@ func (t *Table) Flush() {
 }
 
 func Field(key, value string) {
-	fmt.Printf("%-20s %s\n", bold.Sprint(key+":"), value)
+	padded := fmt.Sprintf("%-19s:", key)
+	fmt.Printf("%s %s\n", wazuhBlueStr(padded), value)
+}
+
+// ShowCount prints "Showing N of M <label>" with colored numbers.
+func ShowCount(shown, total int, label string) {
+	fmt.Printf("Showing %s of %s %s\n\n",
+		color.New(color.FgHiWhite, color.Bold).Sprintf("%d", shown),
+		color.New(color.FgHiWhite, color.Bold).Sprintf("%d", total),
+		label,
+	)
 }
 
 // Truncate is exported so commands can trim long fields before passing to Row.
@@ -142,6 +155,26 @@ func ColorLevel(level int) string {
 		return faint.Sprint(s)
 	}
 }
+
+// ColorDesc tints a description string based on alert level.
+func ColorDesc(level int, desc string) string {
+	switch {
+	case level >= 12:
+		return color.New(color.FgRed).Sprint(desc)
+	case level >= 8:
+		return color.New(color.FgYellow).Sprint(desc)
+	case level >= 5:
+		return desc // default terminal color is fine for medium
+	default:
+		return faint.Sprint(desc)
+	}
+}
+
+// Dim returns s in faint/dim style (timestamps, secondary info).
+func Dim(s string) string { return faint.Sprint(s) }
+
+// Cyan returns s in dim cyan (agent names, identifiers).
+func Cyan(s string) string { return color.New(color.FgCyan).Sprint(s) }
 
 func ColorSeverity(s string) string {
 	switch strings.ToLower(s) {

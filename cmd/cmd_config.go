@@ -6,46 +6,81 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"text/tabwriter"
 
+	"github.com/charmbracelet/lipgloss"
 	"github.com/fatih/color"
-	"github.com/spf13/cobra"
 	"golang.org/x/term"
 )
 
-func newConfigCmd() *cobra.Command {
-	cmd := &cobra.Command{
-		Use:     "config",
-		Short:   "Show or initialize configuration",
-		Aliases: []string{"c"},
-		Run: func(cmd *cobra.Command, args []string) {
-			if cfg == nil || cfg.APIURL == "" {
-				fmt.Println(color.YellowString("No configuration found."))
-				fmt.Println("Run: wazuh-cli config init")
-				return
-			}
-			fmt.Printf("%-20s %s\n", "API URL:", cfg.APIURL)
-			fmt.Printf("%-20s %s\n", "Auth User:", cfg.Auth.Username)
-			fmt.Printf("%-20s %s\n", "Indexer URL:", cfg.Indexer.URL)
-			fmt.Printf("%-20s %s\n", "Indexer User:", cfg.Indexer.Username)
-			fmt.Printf("%-20s %v\n", "Insecure TLS:", cfg.Insecure)
-		},
+func handleConfig(args []string) {
+	if len(args) == 0 || args[0] == "show" {
+		configShow()
+		return
 	}
-
-	cmd.AddCommand(&cobra.Command{
-		Use:   "init",
-		Short: "Interactive wizard to create config.toml",
-		RunE: func(cmd *cobra.Command, args []string) error {
-			return runConfigInit()
-		},
-	})
-
-	return cmd
+	switch args[0] {
+	case "init":
+		configInit()
+	default:
+		printUnknownSub("config", args[0])
+	}
 }
 
-func runConfigInit() error {
+func configShow() {
+	if cfg == nil || cfg.APIURL == "" {
+		printWarn("No configuration found — run: config init")
+		return
+	}
+
+	rows := []struct{ key, val string }{
+		{"api_url", cfg.APIURL},
+		{"username", cfg.Auth.Username},
+		{"insecure", fmt.Sprintf("%v", cfg.Insecure)},
+		{"indexer_url", cfg.Indexer.URL},
+		{"indexer_username", cfg.Indexer.Username},
+	}
+
+	// Compute column widths
+	keyW, valW := len("Setting"), len("Value")
+	for _, r := range rows {
+		if r.val == "" {
+			continue
+		}
+		if len(r.key) > keyW {
+			keyW = len(r.key)
+		}
+		if len(r.val) > valW {
+			valW = len(r.val)
+		}
+	}
+
+	tableW := 1 + keyW + 2 + valW + 1 // leading space + gap + trailing space
+
+	// Title
+	titleStyle := lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("39"))
+	fmt.Println()
+	fmt.Println(lipgloss.PlaceHorizontal(tableW, lipgloss.Center, titleStyle.Render("Configuration")))
+	fmt.Println()
+
+	// Table via tabwriter for perfect alignment
+	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
+	hdr := lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("255"))
+	fmt.Fprintf(w, " %s\t%s\n", hdr.Render("Setting"), hdr.Render("Value"))
+	for _, r := range rows {
+		if r.val == "" {
+			continue
+		}
+		fmt.Fprintf(w, " \033[38;5;33m%s\033[0m\t%s\n", r.key, r.val)
+	}
+	w.Flush()
+	fmt.Println()
+}
+
+func configInit() {
 	home, err := os.UserHomeDir()
 	if err != nil {
-		return err
+		printErr(err)
+		return
 	}
 	cfgDir := filepath.Join(home, ".config", "wazuh-cli")
 	cfgPath := filepath.Join(cfgDir, "config.toml")
@@ -53,7 +88,7 @@ func runConfigInit() error {
 	bold := color.New(color.Bold)
 	bold.Println("wazuh-cli config init")
 	fmt.Println()
-	fmt.Printf("Config path: %s\n", color.New(color.Faint).Sprint(cfgPath))
+	fmt.Printf("Config path: %s\n", brandDim.Sprint(cfgPath))
 
 	if _, err := os.Stat(cfgPath); err == nil {
 		fmt.Print(color.YellowString("File already exists. Overwrite? [y/N] "))
@@ -61,7 +96,7 @@ func runConfigInit() error {
 		fmt.Scanln(&answer)
 		if strings.ToLower(strings.TrimSpace(answer)) != "y" {
 			fmt.Println("Aborted.")
-			return nil
+			return
 		}
 	}
 
@@ -69,7 +104,6 @@ func runConfigInit() error {
 	bold.Println("Manager API (port 55000)")
 
 	reader := bufio.NewReader(os.Stdin)
-
 	apiURL := promptLine(reader, "URL", "https://localhost:55000")
 	username := promptLine(reader, "Username", "wazuh-wui")
 	password := promptPassword("Password")
@@ -78,7 +112,7 @@ func runConfigInit() error {
 
 	fmt.Println()
 	bold.Println("OpenSearch Indexer (port 9200, optional)")
-	fmt.Println(color.New(color.Faint).Sprint("Leave URL empty to skip."))
+	fmt.Println(brandDim.Sprint("Leave URL empty to skip."))
 	fmt.Println()
 
 	indexerURL := promptLine(reader, "Indexer URL", "")
@@ -88,7 +122,6 @@ func runConfigInit() error {
 		indexerPass = promptPassword("Indexer password")
 	}
 
-	// Build TOML
 	var sb strings.Builder
 	insecureStr := "false"
 	if insecure {
@@ -107,20 +140,24 @@ func runConfigInit() error {
 	}
 
 	if err := os.MkdirAll(cfgDir, 0700); err != nil {
-		return fmt.Errorf("cannot create config directory: %w", err)
+		printErr(fmt.Errorf("cannot create config directory: %w", err))
+		return
 	}
 	if err := os.WriteFile(cfgPath, []byte(sb.String()), 0600); err != nil {
-		return fmt.Errorf("cannot write config: %w", err)
+		printErr(fmt.Errorf("cannot write config: %w", err))
+		return
 	}
 
 	fmt.Println()
-	color.New(color.FgGreen, color.Bold).Printf("Config written to %s\n", cfgPath)
-	return nil
+	printOK(fmt.Sprintf("Config written to %s", cfgPath))
+
+	// Reload clients so REPL picks up the new config immediately.
+	reloadConfig()
 }
 
 func promptLine(r *bufio.Reader, label, defaultVal string) string {
 	if defaultVal != "" {
-		fmt.Printf("  %s [%s]: ", label, color.New(color.Faint).Sprint(defaultVal))
+		fmt.Printf("  %s [%s]: ", label, brandDim.Sprint(defaultVal))
 	} else {
 		fmt.Printf("  %s: ", label)
 	}
@@ -141,7 +178,6 @@ func promptPassword(label string) string {
 			return string(pw)
 		}
 	}
-	// Fallback: plain read
 	reader := bufio.NewReader(os.Stdin)
 	line, _ := reader.ReadString('\n')
 	return strings.TrimSpace(line)
