@@ -45,8 +45,7 @@ func (g *GroupsAPI) Delete(name string) error {
 func (g *GroupsAPI) Assign(agentID, groupID string) error {
 	path := fmt.Sprintf("/agents/group?agents_list=%s&group_id=%s",
 		url.QueryEscape(agentID), url.QueryEscape(groupID))
-	var resp APIResponse[Agent]
-	return g.c.PutDecode(path, struct{}{}, &resp)
+	return g.c.PutDecode(path, struct{}{}, nil)
 }
 
 func (g *GroupsAPI) Unassign(agentID, groupID string) error {
