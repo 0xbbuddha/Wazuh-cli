@@ -47,7 +47,7 @@ func Load() (*Config, error) {
 		if !errors.As(err, &notFound) {
 			return nil, fmt.Errorf("cannot read config: %w", err)
 		}
-		// Missing config file is OK — "config init" can create it.
+		// Missing config file is OK - "config init" can create it.
 		return &Config{}, nil
 	}
 

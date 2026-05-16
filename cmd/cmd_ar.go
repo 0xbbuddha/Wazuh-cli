@@ -66,7 +66,7 @@ func arRun(args []string) {
 
 	fs := flag.NewFlagSet("ar run", flag.ContinueOnError)
 	force := fs.Bool("f", false, "Skip confirmation for mass operations")
-	// positional args are before flags — parse them manually
+	// positional args are before flags - parse them manually
 	agentID := args[0]
 	actionName := args[1]
 	remaining := args[2:]
@@ -76,7 +76,7 @@ func arRun(args []string) {
 
 	action, ok := arActions[actionName]
 	if !ok {
-		printErr(fmt.Errorf("unknown action %q — run 'ar list' to see available actions", actionName))
+		printErr(fmt.Errorf("unknown action %q - run 'ar list' to see available actions", actionName))
 		return
 	}
 
@@ -120,7 +120,7 @@ func arRun(args []string) {
 		color.New(color.FgRed, color.Bold).Printf("[!] Failed ")
 		fmt.Printf("(%d affected, %d failed)\n", result.TotalAffected, result.TotalFailed)
 		for _, f := range result.FailedItems {
-			fmt.Printf("  agents %v — [%d] %s\n", f.IDs, f.Error.Code, f.Error.Message)
+			fmt.Printf("  agents %v - [%d] %s\n", f.IDs, f.Error.Code, f.Error.Message)
 		}
 		return
 	}

@@ -242,7 +242,7 @@ func groupsConfigEdit(args []string) {
 
 	// Skip upload if nothing changed
 	if string(updated) == original {
-		printWarn("No changes detected — config not updated.")
+		printWarn("No changes detected - config not updated.")
 		return
 	}
 

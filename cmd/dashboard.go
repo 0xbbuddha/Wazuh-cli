@@ -20,7 +20,7 @@ var (
 	clrDim      = lipgloss.Color("245") // dim text (content area)
 	clrBarText  = lipgloss.Color("252") // text inside header/status bars
 	clrBright   = lipgloss.Color("255") // bright text
-	clrBarBg    = lipgloss.Color("236") // header/footer bg — darker for contrast
+	clrBarBg    = lipgloss.Color("236") // header/footer bg - darker for contrast
 	clrTabBg    = lipgloss.Color("234") // tab bar bg
 	clrSel      = lipgloss.Color("237") // selected row bg
 	clrInputBg  = lipgloss.Color("236") // search input bg
@@ -489,14 +489,14 @@ func wrapModalLine(line string, maxW int) []string {
 		return []string{line}
 	}
 	runes := []rune(line)
-	// Has ANSI codes — truncate by rune count
+	// Has ANSI codes - truncate by rune count
 	if visW != len(runes) {
 		if len(runes) > maxW {
 			return []string{string(runes[:maxW])}
 		}
 		return []string{line}
 	}
-	// Plain text — word wrap by rune
+	// Plain text - word wrap by rune
 	var result []string
 	for len(runes) > maxW {
 		cut := maxW

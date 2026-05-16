@@ -44,6 +44,7 @@ func buildCompleter() *readline.PrefixCompleter {
 			readline.PcItem("get"),
 			readline.PcItem("restart"),
 			readline.PcItem("summary"),
+			readline.PcItem("enroll"),
 			readline.PcItem("add"),
 			readline.PcItem("remove"),
 			readline.PcItem("upgrade"),
@@ -127,11 +128,11 @@ func RunREPL(version string, flags StartupFlags) {
 		if managerClient != nil {
 			m := api.NewManagerAPI(managerClient)
 			if info, err := m.Info(); err == nil {
-				printInfo(fmt.Sprintf("Wazuh %s — type 'dashboard' for the TUI", info.Version))
+				printInfo(fmt.Sprintf("Wazuh %s - type 'dashboard' for the TUI", info.Version))
 			}
 		}
 	} else {
-		printWarn("No configuration found — run 'config init' to get started")
+		printWarn("No configuration found - run 'config init' to get started")
 	}
 	fmt.Println()
 

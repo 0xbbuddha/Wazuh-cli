@@ -20,7 +20,7 @@ func init() {
 	registry = map[string]cmdEntry{
 		"agent":        {"Manage Wazuh agents", handleAgent},
 		"alerts":       {"Query alerts from the Wazuh Indexer", handleAlerts},
-		"ar":           {"Active response — trigger actions on agents", handleAR},
+		"ar":           {"Active response - trigger actions on agents", handleAR},
 		"cluster":      {"Cluster status and nodes", handleCluster},
 		"config":       {"Show or initialize configuration", handleConfig},
 		"dashboard":    {"Interactive TUI dashboard", handleDashboard},
@@ -48,7 +48,7 @@ func dispatch(line string) {
 	}
 	entry, ok := registry[parts[0]]
 	if !ok {
-		fmt.Printf("%s Unknown command %q — type 'help' for available commands\n",
+		fmt.Printf("%s Unknown command %q - type 'help' for available commands\n",
 			color.New(color.FgYellow, color.Bold).Sprint("[?]"), parts[0])
 		return
 	}

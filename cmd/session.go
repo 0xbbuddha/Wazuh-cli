@@ -74,13 +74,13 @@ func promptConfirm(question string) bool {
 }
 
 func printUnknownSub(cmd, sub string) {
-	fmt.Printf("%s Unknown %s subcommand %q — try 'help %s'\n",
+	fmt.Printf("%s Unknown %s subcommand %q - try 'help %s'\n",
 		color.New(color.FgYellow, color.Bold).Sprint("[?]"), cmd, sub, cmd)
 }
 
 func needsManager() bool {
 	if managerClient == nil {
-		printErr(fmt.Errorf("not connected — run: config init"))
+		printErr(fmt.Errorf("not connected - run: config init"))
 		return false
 	}
 	return true
@@ -88,7 +88,7 @@ func needsManager() bool {
 
 func needsIndexer() bool {
 	if indexerClient == nil {
-		printErr(fmt.Errorf("indexer not configured — add [indexer] section to config.toml"))
+		printErr(fmt.Errorf("indexer not configured - add [indexer] section to config.toml"))
 		return false
 	}
 	return true

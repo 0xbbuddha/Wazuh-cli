@@ -11,5 +11,5 @@ var wazuhASCII = `  ██╗    ██╗ █████╗ ██████
 
 func printBanner() {
 	fmt.Println("\033[38;5;33m\033[1m" + wazuhASCII + "\033[0m")
-	brandDim.Printf("\n  v%s  —  Interactive REPL  (type 'help' to get started)\n\n", cliVersion)
+	brandDim.Printf("\n  v%s  -  Interactive REPL  (type 'help' to get started)\n\n", cliVersion)
 }

@@ -251,7 +251,7 @@ func (t scaTab) viewAgents(width, height, spinFrame int) string {
 			lipgloss.NewStyle().Foreground(clrWarn).Render(t.searchInput) +
 			dDimStyle.Render("  (/ to edit)") + "\n")
 	} else {
-		sb.WriteString(prefix + dDimStyle.Render("press / to filter — Enter to drill into SCA policies") + "\n")
+		sb.WriteString(prefix + dDimStyle.Render("press / to filter - Enter to drill into SCA policies") + "\n")
 	}
 
 	if t.agentsLoading || !t.agentsLoaded {
@@ -330,7 +330,7 @@ func (t scaTab) viewPolicies(width, height, spinFrame int) string {
 		if p.Score < 50 {
 			scoreStyle = dDangerStyle
 		}
-		scanDate := "—"
+		scanDate := "-"
 		if len(p.EndScan) >= 10 {
 			scanDate = p.EndScan[:10]
 		}
@@ -365,7 +365,7 @@ func scaChecksModal(policyName string, checks []api.SCACheck, total int) *modalM
 	lines = append(lines, fmt.Sprintf("  %s %d passed   %s %d failed   %s %d N/A",
 		dSuccessStyle.Render("✓"), passed,
 		dDangerStyle.Render("✗"), failed,
-		dDimStyle.Render("—"), na))
+		dDimStyle.Render("-"), na))
 	lines = append(lines, "")
 	lines = append(lines, dDimStyle.Render(strings.Repeat("─", 62)))
 	lines = append(lines, "")
@@ -379,7 +379,7 @@ func scaChecksModal(policyName string, checks []api.SCACheck, total int) *modalM
 		case "failed":
 			badge, st = "✗", dDangerStyle
 		default:
-			badge, st = "—", dDimStyle
+			badge, st = "-", dDimStyle
 		}
 		lines = append(lines, st.Render(fmt.Sprintf(" %s [%d] %s", badge, ch.ID, output.Truncate(ch.Title, 58))))
 		if ch.Result == "failed" && ch.Remediation != "" {

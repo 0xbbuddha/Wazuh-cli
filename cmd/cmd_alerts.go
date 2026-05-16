@@ -216,7 +216,7 @@ func printHeatmap(matrix [7][24]int, days [7]time.Time) {
 	faint := color.New(color.Faint)
 	bold := color.New(color.Bold)
 	bold.Printf("Alert Heatmap")
-	faint.Printf(" — last 7 days   total: %d alerts\n\n", total)
+	faint.Printf(" - last 7 days   total: %d alerts\n\n", total)
 
 	const labelW = 12
 	headerRunes := make([]rune, labelW+28)

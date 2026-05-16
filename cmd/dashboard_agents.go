@@ -440,7 +440,7 @@ func agentDetailModal(a api.Agent) *modalModel {
 		add("Groups", strings.Join(a.Group, ", "))
 	}
 	return &modalModel{
-		title: fmt.Sprintf("Agent %s — %s", a.ID, a.Name),
+		title: fmt.Sprintf("Agent %s - %s", a.ID, a.Name),
 		lines: lines,
 	}
 }
@@ -461,7 +461,7 @@ func agentStatusStyle(status string) lipgloss.Style {
 
 func fmtLastSeen(ts string) string {
 	if ts == "" || ts == "N/A" {
-		return "—"
+		return "-"
 	}
 	t, err := time.Parse(time.RFC3339, ts)
 	if err != nil {

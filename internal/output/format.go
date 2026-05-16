@@ -55,7 +55,7 @@ func JSON(v any) {
 }
 
 // Table buffers all rows, calculates column widths based on visible characters,
-// then flushes with correct padding — ANSI codes do not affect alignment.
+// then flushes with correct padding - ANSI codes do not affect alignment.
 type Table struct {
 	headers []string
 	rows    [][]string

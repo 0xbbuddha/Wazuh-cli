@@ -61,7 +61,7 @@ func runLogtest(lt *api.LogtestAPI, event, logFormat, location, token string, ve
 func printLogtestResult(result *api.LogtestResult) {
 	out := result.Output
 	if out == nil || out.Rule == nil {
-		brandDim.Println("  — no rule matched")
+		brandDim.Println("  - no rule matched")
 		fmt.Println()
 		return
 	}
@@ -152,7 +152,7 @@ func runLogtestREPL(lt *api.LogtestAPI, isTTY bool, logFormat, location string, 
 	var token string
 	scanner := bufio.NewScanner(os.Stdin)
 	if isTTY {
-		brandBlue.Println("  Wazuh logtest  —  type a log line and press Enter  (Ctrl+C to exit)")
+		brandBlue.Println("  Wazuh logtest  -  type a log line and press Enter  (Ctrl+C to exit)")
 		brandDim.Println("  format: " + logFormat + "   location: " + location)
 		fmt.Println()
 	}

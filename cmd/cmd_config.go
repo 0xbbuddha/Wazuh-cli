@@ -28,7 +28,7 @@ func handleConfig(args []string) {
 
 func configShow() {
 	if cfg == nil || cfg.APIURL == "" {
-		printWarn("No configuration found — run: config init")
+		printWarn("No configuration found - run: config init")
 		return
 	}
 

@@ -56,7 +56,7 @@ var subHelp = map[string][]struct{ sub, desc string }{
 		{"get <id>", "Get detailed info for an agent"},
 		{"restart <id>", "Restart an agent"},
 		{"summary", "Show agent connection and config-sync summary"},
-		{"add", "Register a new agent [--name NAME] [--ip IP]"},
+		{"enroll", "Register agent and show full install command [--name NAME] [--os OS]"},
 		{"remove <id>", "Remove an agent [-f to skip confirmation]"},
 		{"upgrade <id>", "Upgrade agent [--version V] [--no-watch]"},
 		{"groups", "List agent groups"},
@@ -133,7 +133,7 @@ func showCommandHelp(name string) {
 		return
 	}
 	fmt.Println()
-	fmt.Printf("  %s — %s\n", wazuhBlue(name), entry.short)
+	fmt.Printf("  %s - %s\n", wazuhBlue(name), entry.short)
 	subs, ok := subHelp[name]
 	if !ok || len(subs) == 0 {
 		fmt.Println()

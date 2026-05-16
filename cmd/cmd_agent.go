@@ -28,6 +28,8 @@ func handleAgent(args []string) {
 		agentRestart(rest)
 	case "summary":
 		agentSummary(rest)
+	case "enroll":
+		agentEnroll(rest)
 	case "add":
 		agentAdd(rest)
 	case "remove":
@@ -186,6 +188,123 @@ func agentAdd(args []string) {
 	fmt.Printf("\n%s\n", brandDim.Sprint("Deploy: /var/ossec/bin/agent-auth -m <manager_ip> -A "+*name))
 }
 
+func agentEnroll(args []string) {
+	if !needsManager() {
+		return
+	}
+	fs := flag.NewFlagSet("agent enroll", flag.ContinueOnError)
+	name := fs.String("name", "", "Agent name (required)")
+	ip := fs.String("ip", "any", "Agent IP or 'any'")
+	osType := fs.String("os", "", "Target OS: linux-deb, linux-rpm, windows, macos-arm64, macos-x64")
+	outFmt := fs.String("o", "table", "Output format: table or json")
+	if err := fs.Parse(args); err != nil {
+		return
+	}
+	output.Format = *outFmt
+
+	if *name == "" {
+		printErr(fmt.Errorf("--name is required"))
+		return
+	}
+	validOS := map[string]bool{
+		"linux-deb": true, "linux-rpm": true, "windows": true,
+		"macos-arm64": true, "macos-x64": true,
+	}
+	if *osType == "" || !validOS[*osType] {
+		printErr(fmt.Errorf("--os is required: linux-deb, linux-rpm, windows, macos-arm64, macos-x64"))
+		return
+	}
+
+	a := api.NewAgentsAPI(managerClient)
+	id, _, err := a.Add(*name, *ip)
+	if err != nil {
+		printErr(err)
+		return
+	}
+
+	// Get manager version for package URL (fallback to "4.x.x" on error)
+	mgrVersion := "4.x.x"
+	if info, err := api.NewManagerAPI(managerClient).Info(); err == nil {
+		mgrVersion = strings.TrimPrefix(info.Version, "v")
+	}
+
+	// Extract hostname from manager URL
+	host := cfg.APIURL
+	host = strings.TrimPrefix(host, "https://")
+	host = strings.TrimPrefix(host, "http://")
+	if idx := strings.LastIndex(host, ":"); idx != -1 {
+		host = host[:idx]
+	}
+
+	if output.Format == "json" {
+		output.JSON(map[string]string{"id": id, "name": *name, "manager": host, "version": mgrVersion, "os": *osType})
+		return
+	}
+
+	printOK(fmt.Sprintf("Agent %q registered - ID: %s", *name, color.New(color.Bold).Sprint(id)))
+	printSection("Deploy on the agent")
+	fmt.Println()
+
+	dim := color.New(color.Faint)
+	bold := color.New(color.Bold)
+
+	switch *osType {
+	case "linux-deb":
+		pkgFile := fmt.Sprintf("wazuh-agent_%s-1_amd64.deb", mgrVersion)
+		pkgURL := "https://packages.wazuh.com/4.x/apt/pool/main/w/wazuh-agent/" + pkgFile
+		bold.Println("  # 1. Download and install")
+		fmt.Printf("  wget %s\n", pkgURL)
+		fmt.Printf("  sudo WAZUH_MANAGER='%s' WAZUH_AGENT_NAME='%s' dpkg -i ./%s\n\n", host, *name, pkgFile)
+		bold.Println("  # 2. Start the agent")
+		fmt.Println("  sudo systemctl daemon-reload")
+		fmt.Println("  sudo systemctl enable wazuh-agent --now")
+
+	case "linux-rpm":
+		pkgFile := fmt.Sprintf("wazuh-agent-%s-1.x86_64.rpm", mgrVersion)
+		pkgURL := "https://packages.wazuh.com/4.x/yum/" + pkgFile
+		bold.Println("  # 1. Download and install")
+		fmt.Printf("  curl -o %s %s\n", pkgFile, pkgURL)
+		fmt.Printf("  sudo WAZUH_MANAGER='%s' WAZUH_AGENT_NAME='%s' rpm -ihv ./%s\n\n", host, *name, pkgFile)
+		bold.Println("  # 2. Start the agent")
+		fmt.Println("  sudo systemctl daemon-reload")
+		fmt.Println("  sudo systemctl enable wazuh-agent --now")
+
+	case "windows":
+		pkgFile := fmt.Sprintf("wazuh-agent-%s-1.msi", mgrVersion)
+		pkgURL := "https://packages.wazuh.com/4.x/windows/" + pkgFile
+		bold.Println("  # PowerShell (run as Administrator)")
+		fmt.Printf("  Invoke-WebRequest -Uri '%s' -OutFile %s\n", pkgURL, pkgFile)
+		fmt.Printf("  msiexec /i %s /q WAZUH_MANAGER='%s' WAZUH_AGENT_NAME='%s'\n\n", pkgFile, host, *name)
+		bold.Println("  # Start the agent")
+		fmt.Println("  NET START WazuhSvc")
+
+	case "macos-arm64":
+		pkgFile := fmt.Sprintf("wazuh-agent-%s-1.arm64.pkg", mgrVersion)
+		pkgURL := "https://packages.wazuh.com/4.x/macos/" + pkgFile
+		bold.Println("  # 1. Download and install")
+		fmt.Printf("  curl -o %s '%s'\n", pkgFile, pkgURL)
+		fmt.Printf("  sudo launchctl setenv WAZUH_MANAGER '%s'\n", host)
+		fmt.Printf("  sudo launchctl setenv WAZUH_AGENT_NAME '%s'\n", *name)
+		fmt.Printf("  sudo installer -pkg ./%s -target /\n\n", pkgFile)
+		bold.Println("  # 2. Start the agent")
+		fmt.Println("  sudo /Library/Ossec/bin/wazuh-control start")
+
+	case "macos-x64":
+		pkgFile := fmt.Sprintf("wazuh-agent-%s-1.intel64.pkg", mgrVersion)
+		pkgURL := "https://packages.wazuh.com/4.x/macos/" + pkgFile
+		bold.Println("  # 1. Download and install")
+		fmt.Printf("  curl -o %s '%s'\n", pkgFile, pkgURL)
+		fmt.Printf("  sudo launchctl setenv WAZUH_MANAGER '%s'\n", host)
+		fmt.Printf("  sudo launchctl setenv WAZUH_AGENT_NAME '%s'\n", *name)
+		fmt.Printf("  sudo installer -pkg ./%s -target /\n\n", pkgFile)
+		bold.Println("  # 2. Start the agent")
+		fmt.Println("  sudo /Library/Ossec/bin/wazuh-control start")
+	}
+
+	fmt.Println()
+	dim.Printf("  Agent ID %s · manager %s · wazuh %s\n\n", id, host, mgrVersion)
+}
+
 func agentRemove(args []string) {
 	if !needsManager() {
 		return
@@ -236,7 +355,7 @@ func agentUpgrade(args []string) {
 	if err != nil {
 		msg := err.Error()
 		if strings.HasPrefix(msg, "already up to date") || strings.HasPrefix(msg, "newer than repo") {
-			fmt.Printf("%s agent %s — %s\n", color.YellowString("note:"), color.GreenString(agentID), msg)
+			fmt.Printf("%s agent %s - %s\n", color.YellowString("note:"), color.GreenString(agentID), msg)
 			return
 		}
 		printErr(err)
@@ -277,7 +396,7 @@ func agentUpgrade(args []string) {
 		}
 		done, failed := 0, 0
 		fmt.Print("\033[H\033[2J")
-		fmt.Printf("Upgrade to %s — agent %s\n\n", color.CyanString(target), color.GreenString(agentID))
+		fmt.Printf("Upgrade to %s - agent %s\n\n", color.CyanString(target), color.GreenString(agentID))
 		for _, s := range statuses {
 			var badge string
 			switch s.Status {
@@ -314,7 +433,7 @@ func agentUpgrade(args []string) {
 		spin++
 		time.Sleep(5 * time.Second)
 	}
-	printWarn(fmt.Sprintf("polling timed out — check manually: agent get %s", agentID))
+	printWarn(fmt.Sprintf("polling timed out - check manually: agent get %s", agentID))
 }
 
 func agentGroups(_ []string) {
