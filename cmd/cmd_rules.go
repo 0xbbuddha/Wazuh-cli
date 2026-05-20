@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/fatih/color"
+
 	"github.com/0xbbuddha/wazuh-cli/internal/api"
 	"github.com/0xbbuddha/wazuh-cli/internal/output"
 )
@@ -33,15 +35,20 @@ func rulesList(args []string) {
 	fs := flag.NewFlagSet("rules list", flag.ContinueOnError)
 	level := fs.Int("level", 0, "Filter by minimum rule level (0 = no filter)")
 	group := fs.String("group", "", "Filter by rule group")
-	limit := fs.Int("limit", 500, "Maximum number of results")
+	limit := fs.Int("limit", 20, "Results per page")
+	page := fs.Int("page", 1, "Page number (starts at 1)")
 	outFmt := fs.String("o", "table", "Output format: table or json")
 	if err := fs.Parse(args); err != nil {
 		return
 	}
 	output.Format = *outFmt
+	if *page < 1 {
+		*page = 1
+	}
+	offset := (*page - 1) * *limit
 
 	r := api.NewRulesAPI(managerClient)
-	rules, total, err := r.List(*level, *group, *limit)
+	rules, total, err := r.List(*level, *group, *limit, offset)
 	if err != nil {
 		printErr(err)
 		return
@@ -50,13 +57,17 @@ func rulesList(args []string) {
 		output.JSON(rules)
 		return
 	}
-	output.ShowCount(len(rules), total, "rules")
+	totalPages := (total + *limit - 1) / *limit
+	output.ShowCount(len(rules), total, fmt.Sprintf("rules - page %d/%d", *page, totalPages))
 	t := output.NewTable("ID", "LEVEL", "GROUPS", "DESCRIPTION")
 	for _, rule := range rules {
 		t.Row(fmt.Sprintf("%d", rule.ID), output.ColorLevel(rule.Level),
 			strings.Join(rule.Groups, ","), output.Truncate(rule.Description, 60))
 	}
 	t.Flush()
+	if totalPages > 1 {
+		color.New(color.Faint).Printf("\n  --page %d/%d  (--limit %d to change page size)\n\n", *page, totalPages, *limit)
+	}
 }
 
 func rulesGet(args []string) {

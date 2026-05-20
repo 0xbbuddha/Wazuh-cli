@@ -16,9 +16,12 @@ func NewAgentsAPI(c *client.Client) *AgentsAPI {
 	return &AgentsAPI{c: c}
 }
 
-func (a *AgentsAPI) List(status, group string, limit int) ([]Agent, int, error) {
+func (a *AgentsAPI) List(status, group string, limit, offset int) ([]Agent, int, error) {
 	params := url.Values{}
 	params.Set("limit", fmt.Sprintf("%d", limit))
+	if offset > 0 {
+		params.Set("offset", fmt.Sprintf("%d", offset))
+	}
 	if status != "" {
 		params.Set("status", status)
 	}

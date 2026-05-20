@@ -62,7 +62,7 @@ func newScaTab() scaTab { return scaTab{} }
 func scaLoadAgents() tea.Cmd {
 	return func() tea.Msg {
 		agAPI := api.NewAgentsAPI(managerClient)
-		agents, total, err := agAPI.List("", "", 500)
+		agents, total, err := agAPI.List("", "", 500, 0)
 		if err != nil {
 			return scaAgentsDataMsg{}
 		}

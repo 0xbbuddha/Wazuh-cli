@@ -184,7 +184,7 @@ func groupsConfig(args []string) {
 		printErr(err)
 		return
 	}
-	fmt.Println(xml)
+	fmt.Println(output.XMLHighlight(xml))
 }
 
 func groupsConfigEdit(args []string) {

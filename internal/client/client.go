@@ -140,19 +140,50 @@ func (c *Client) ensureToken() error {
 }
 
 // Do executes an authenticated request against the Wazuh manager API.
+// On 401, it forces a token refresh and retries once.
 func (c *Client) Do(method, path string, body io.Reader) (*http.Response, error) {
 	if err := c.ensureToken(); err != nil {
 		return nil, err
 	}
-	req, err := http.NewRequest(method, c.baseURL+path, body)
+	// Buffer body so we can retry on 401.
+	var bodyBytes []byte
+	if body != nil {
+		var err error
+		bodyBytes, err = io.ReadAll(body)
+		if err != nil {
+			return nil, err
+		}
+	}
+	doOnce := func() (*http.Response, error) {
+		var r io.Reader
+		if bodyBytes != nil {
+			r = bytes.NewReader(bodyBytes)
+		}
+		req, err := http.NewRequest(method, c.baseURL+path, r)
+		if err != nil {
+			return nil, err
+		}
+		req.Header.Set("Authorization", "Bearer "+c.token)
+		if bodyBytes != nil {
+			req.Header.Set("Content-Type", "application/json")
+		}
+		return c.httpClient.Do(req)
+	}
+	resp, err := doOnce()
 	if err != nil {
 		return nil, err
 	}
-	req.Header.Set("Authorization", "Bearer "+c.token)
-	if body != nil {
-		req.Header.Set("Content-Type", "application/json")
+	if resp.StatusCode == http.StatusUnauthorized {
+		resp.Body.Close()
+		c.mu.Lock()
+		c.token = ""
+		c.mu.Unlock()
+		if err := c.ensureToken(); err != nil {
+			return nil, fmt.Errorf("session expired - re-authentication failed: %w", err)
+		}
+		return doOnce()
 	}
-	return c.httpClient.Do(req)
+	return resp, nil
 }
 
 // Get is a helper for GET requests that decodes JSON into dst.
