@@ -1,0 +1,67 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - os: linux
+            arch: amd64
+          - os: linux
+            arch: arm64
+          - os: darwin
+            arch: amd64
+          - os: darwin
+            arch: arm64
+          - os: windows
+            arch: amd64
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
+
+      - name: Build
+        env:
+          GOOS: ${{ matrix.os }}
+          GOARCH: ${{ matrix.arch }}
+        run: |
+          VERSION=${GITHUB_REF#refs/tags/}
+          EXT=""
+          if [ "${{ matrix.os }}" = "windows" ]; then EXT=".exe"; fi
+          BINARY="wazuh-cli-${{ matrix.os }}-${{ matrix.arch }}${EXT}"
+          go build -ldflags "-X main.version=${VERSION}" -o "${BINARY}" .
+          echo "BINARY=${BINARY}" >> $GITHUB_ENV
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: wazuh-cli-${{ matrix.os }}-${{ matrix.arch }}
+          path: ${{ env.BINARY }}
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+
+      - name: Create release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: artifacts/*
+          generate_release_notes: true
