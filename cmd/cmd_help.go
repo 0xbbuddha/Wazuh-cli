@@ -112,6 +112,11 @@ var subHelp = map[string][]struct{ sub, desc string }{
 		{"list <agent_id>", "List SCA policies and scores for an agent"},
 		{"checks <agent_id> <policy_id>", "Show detailed check results for a policy"},
 	},
+	"syscheck": {
+		{"files <agent_id>", "List FIM events [--event added|modified|deleted] [--search PATH] [--limit N] [--page N]"},
+		{"last <agent_id>", "Show date of last FIM scan"},
+		{"scan <agent_id>", "Trigger a FIM scan on an agent"},
+	},
 	"syscollector": {
 		{"hardware <agent_id>", "CPU and RAM information"},
 		{"os <agent_id>", "OS information"},

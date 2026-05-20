@@ -202,11 +202,15 @@ func (c *Client) Get(path string, dst any) error {
 
 // Put is a helper for PUT requests with a JSON body.
 func (c *Client) Put(path string, payload any) error {
-	var buf bytes.Buffer
-	if err := json.NewEncoder(&buf).Encode(payload); err != nil {
-		return err
+	var body io.Reader
+	if payload != nil {
+		var buf bytes.Buffer
+		if err := json.NewEncoder(&buf).Encode(payload); err != nil {
+			return err
+		}
+		body = &buf
 	}
-	resp, err := c.Do(http.MethodPut, path, &buf)
+	resp, err := c.Do(http.MethodPut, path, body)
 	if err != nil {
 		return err
 	}
@@ -220,11 +224,15 @@ func (c *Client) Put(path string, payload any) error {
 
 // PutDecode is like Put but also decodes the response body into dst.
 func (c *Client) PutDecode(path string, payload any, dst any) error {
-	var buf bytes.Buffer
-	if err := json.NewEncoder(&buf).Encode(payload); err != nil {
-		return err
+	var body io.Reader
+	if payload != nil {
+		var buf bytes.Buffer
+		if err := json.NewEncoder(&buf).Encode(payload); err != nil {
+			return err
+		}
+		body = &buf
 	}
-	resp, err := c.Do(http.MethodPut, path, &buf)
+	resp, err := c.Do(http.MethodPut, path, body)
 	if err != nil {
 		return err
 	}
