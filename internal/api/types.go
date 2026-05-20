@@ -293,6 +293,29 @@ type ClusterStatus struct {
 	Running string `json:"running"`
 }
 
+// --- Syscheck / FIM types ---
+
+type SyscheckFile struct {
+	File  string `json:"file"`
+	Type  string `json:"type"`
+	Event string `json:"event"`
+	Mtime string `json:"mtime"`
+	Date  string `json:"date"`
+	Size  int    `json:"size"`
+	Perm  string `json:"perm"`
+	Uname string `json:"uname"`
+	Gname string `json:"gname"`
+	Md5   string `json:"md5"`
+	Sha1  string `json:"sha1"`
+	Sha256 string `json:"sha256"`
+}
+
+type SyscheckLastScan struct {
+	Start string `json:"start"`
+	End   string `json:"end"`
+}
+
+
 type ClusterNode struct {
 	Name    string `json:"name"`
 	IP      string `json:"ip"`

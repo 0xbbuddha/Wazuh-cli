@@ -31,6 +31,7 @@ func init() {
 		"rules":        {"Browse detection rules", handleRules},
 		"sca":          {"Security Configuration Assessment results", handleSCA},
 		"syscollector": {"System inventory for an agent", handleSyscollector},
+		"syscheck":     {"File Integrity Monitoring (FIM) results", handleSyscheck},
 		"vuln":         {"Vulnerability detection results", handleVuln},
 		"help":         {"Show available commands", handleHelp},
 		"version":      {"Print version", func(_ []string) { fmt.Printf("wazuh-cli %s\n", cliVersion) }},
