@@ -137,6 +137,9 @@ func RunREPL(version string, flags StartupFlags) {
 	}
 	fmt.Println()
 
+	// Wire promptConfirm to use readline so it respects raw terminal mode.
+	replInstance = nil // reset in case of restart
+
 	rl, err := readline.NewEx(&readline.Config{
 		Prompt:          buildPrompt(),
 		HistoryFile:     os.ExpandEnv("$HOME/.wazuh_cli_history"),
@@ -149,6 +152,7 @@ func RunREPL(version string, flags StartupFlags) {
 		os.Exit(1)
 	}
 	defer rl.Close()
+	replInstance = rl
 
 	for {
 		line, err := rl.Readline()

@@ -1,7 +1,6 @@
 package cmd
 
 import (
-	"bufio"
 	"fmt"
 	"os"
 	"strings"
@@ -19,6 +18,10 @@ var (
 	managerClient *client.Client
 	indexerClient *api.IndexerClient
 	cliVersion    string
+	replInstance  interface {
+		SetPrompt(string)
+		Readline() (string, error)
+	}
 )
 
 var (
@@ -61,16 +64,23 @@ func printSection(title string) {
 	fmt.Printf("\n\033[38;5;33m\033[1m%s\033[0m\n", title)
 }
 
-// promptConfirm prints a [y/N] prompt and returns true only if the user types "y".
-// Returns false immediately if stdin is not a terminal (non-interactive mode).
+// promptConfirm uses readline when available so it respects the terminal raw mode.
 func promptConfirm(question string) bool {
-	fmt.Print(question + " [y/N] ")
-	scanner := bufio.NewScanner(os.Stdin)
-	if !scanner.Scan() {
-		fmt.Println()
-		return false
+	prompt := question + " [y/N] "
+	if replInstance != nil {
+		replInstance.SetPrompt(prompt)
+		answer, err := replInstance.Readline()
+		replInstance.SetPrompt(buildPrompt())
+		if err != nil {
+			return false
+		}
+		return strings.ToLower(strings.TrimSpace(answer)) == "y"
 	}
-	return strings.ToLower(strings.TrimSpace(scanner.Text())) == "y"
+	// Fallback for non-REPL use.
+	fmt.Print(prompt)
+	var answer string
+	fmt.Scanln(&answer)
+	return strings.ToLower(strings.TrimSpace(answer)) == "y"
 }
 
 func printUnknownSub(cmd, sub string) {
