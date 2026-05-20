@@ -15,9 +15,12 @@ func NewRulesAPI(c *client.Client) *RulesAPI {
 	return &RulesAPI{c: c}
 }
 
-func (r *RulesAPI) List(level int, group string, limit int) ([]Rule, int, error) {
+func (r *RulesAPI) List(level int, group string, limit, offset int) ([]Rule, int, error) {
 	params := url.Values{}
 	params.Set("limit", fmt.Sprintf("%d", limit))
+	if offset > 0 {
+		params.Set("offset", fmt.Sprintf("%d", offset))
+	}
 	if level > 0 {
 		params.Set("level", fmt.Sprintf("%d", level))
 	}

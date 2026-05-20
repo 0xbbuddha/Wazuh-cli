@@ -66,7 +66,7 @@ func newAgentsTab() agentsTab { return agentsTab{} }
 func agentsLoad() tea.Cmd {
 	return func() tea.Msg {
 		agAPI := api.NewAgentsAPI(managerClient)
-		agents, total, err := agAPI.List("", "", 500)
+		agents, total, err := agAPI.List("", "", 500, 0)
 		if err != nil {
 			return agentsDataMsg{}
 		}

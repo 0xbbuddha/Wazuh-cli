@@ -215,6 +215,37 @@ func ColorDaemon(s string) string {
 	}
 }
 
+// XMLHighlight applies simple terminal colors to XML content:
+// comments -> dim, tag names -> blue bold, attribute names -> yellow,
+// attribute values -> cyan, text content stays default.
+func XMLHighlight(s string) string {
+	comment := regexp.MustCompile(`<!--[\s\S]*?-->`)
+	tag := regexp.MustCompile(`</?[a-zA-Z][^>]*>`)
+	attrName := regexp.MustCompile(`\b([a-zA-Z_][a-zA-Z0-9_-]*)=`)
+	attrVal := regexp.MustCompile(`"([^"]*)"`)
+
+	// Replace in order: comments first (to avoid tag matching inside them),
+	// then tags, then attributes within the already-colored tag blocks.
+	s = comment.ReplaceAllStringFunc(s, func(m string) string {
+		return color.New(color.Faint).Sprint(m)
+	})
+	s = tag.ReplaceAllStringFunc(s, func(m string) string {
+		// Color attribute values first, then attribute names, then brackets/tag name.
+		m = attrVal.ReplaceAllStringFunc(m, func(v string) string {
+			return color.New(color.FgCyan).Sprint(v)
+		})
+		m = attrName.ReplaceAllStringFunc(m, func(a string) string {
+			return color.New(color.FgYellow).Sprint(a)
+		})
+		// Color the tag brackets and name in blue.
+		m = regexp.MustCompile(`^</?[a-zA-Z][a-zA-Z0-9_:-]*`).ReplaceAllStringFunc(m, func(t string) string {
+			return wazuhBlueStr(t)
+		})
+		return m
+	})
+	return s
+}
+
 // ProgressBar renders a colored filled/empty bar for a 0-100 score.
 // Example: [████████████░░░░░░░░] 60%
 func ProgressBar(score int) string {

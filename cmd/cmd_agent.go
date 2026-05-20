@@ -50,15 +50,20 @@ func agentList(args []string) {
 	fs := flag.NewFlagSet("agent list", flag.ContinueOnError)
 	status := fs.String("status", "", "Filter by status: active, disconnected, never_connected, pending")
 	group := fs.String("group", "", "Filter by group name")
-	limit := fs.Int("limit", 500, "Maximum number of results")
+	limit := fs.Int("limit", 20, "Results per page")
+	page := fs.Int("page", 1, "Page number (starts at 1)")
 	outFmt := fs.String("o", "table", "Output format: table or json")
 	if err := fs.Parse(args); err != nil {
 		return
 	}
 	output.Format = *outFmt
+	if *page < 1 {
+		*page = 1
+	}
+	offset := (*page - 1) * *limit
 
 	a := api.NewAgentsAPI(managerClient)
-	agents, total, err := a.List(*status, *group, *limit)
+	agents, total, err := a.List(*status, *group, *limit, offset)
 	if err != nil {
 		printErr(err)
 		return
@@ -67,7 +72,8 @@ func agentList(args []string) {
 		output.JSON(agents)
 		return
 	}
-	output.ShowCount(len(agents), total, "agents")
+	totalPages := (total + *limit - 1) / *limit
+	output.ShowCount(len(agents), total, fmt.Sprintf("agents - page %d/%d", *page, totalPages))
 	t := output.NewTable("ID", "NAME", "STATUS", "IP", "OS", "VERSION", "GROUP")
 	for _, ag := range agents {
 		t.Row(output.Dim(ag.ID), output.Cyan(ag.Name), output.ColorStatus(ag.Status),
@@ -76,6 +82,9 @@ func agentList(args []string) {
 			output.Dim(ag.Version), strings.Join(ag.Group, ","))
 	}
 	t.Flush()
+	if totalPages > 1 {
+		color.New(color.Faint).Printf("\n  --page %d/%d  (--limit %d to change page size)\n\n", *page, totalPages, *limit)
+	}
 }
 
 func agentGet(args []string) {
@@ -113,7 +122,11 @@ func agentGet(args []string) {
 	output.Field("OS", ag.Os.Name+" "+ag.Os.Version+" ("+ag.Os.Arch+")")
 	output.Field("Platform", ag.Os.Platform)
 	output.Field("Version", ag.Version)
-	output.Field("Groups", strings.Join(ag.Group, ", "))
+	coloredGroups := make([]string, len(ag.Group))
+	for i, g := range ag.Group {
+		coloredGroups[i] = output.Cyan(g)
+	}
+	output.Field("Groups", strings.Join(coloredGroups, ", "))
 	output.Field("Date added", ag.DateAdd)
 	output.Field("Last keepalive", ag.LastKeepAlive)
 }
