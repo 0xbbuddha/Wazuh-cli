@@ -104,7 +104,15 @@ func (a *AgentsAPI) Add(name, ip string) (id, key string, err error) {
 }
 
 func (a *AgentsAPI) Remove(id string) error {
-	return a.c.Delete("/agents?agents_list="+id, nil)
+	path := "/agents?agents_list=" + id + "&status=active,disconnected,never_connected,pending&older_than=0s"
+	var resp APIResponse[string]
+	if err := a.c.Delete(path, &resp); err != nil {
+		return err
+	}
+	if resp.Data.TotalAffectedItems == 0 && len(resp.Data.FailedItems) > 0 {
+		return fmt.Errorf("%s", resp.Data.FailedItems[0].Error.Message)
+	}
+	return nil
 }
 
 func (a *AgentsAPI) Upgrade(id, version string) ([]UpgradeTask, error) {
