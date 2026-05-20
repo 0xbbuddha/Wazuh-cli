@@ -107,6 +107,7 @@ func buildCompleter() *readline.PrefixCompleter {
 			readline.PcItem("list"),
 			readline.PcItem("summary"),
 		),
+		readline.PcItem("status"),
 		readline.PcItem("help"),
 		readline.PcItem("clear"),
 		readline.PcItem("exit"),

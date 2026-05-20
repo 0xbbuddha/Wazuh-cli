@@ -27,6 +27,7 @@ func init() {
 		"groups":       {"Manage agent groups", handleGroups},
 		"logtest":      {"Test a log against Wazuh rules", handleLogtest},
 		"manager":      {"Manager information and status", handleManager},
+		"status":       {"Quick overview: manager, agents, indexer", handleStatus},
 		"rules":        {"Browse detection rules", handleRules},
 		"sca":          {"Security Configuration Assessment results", handleSCA},
 		"syscollector": {"System inventory for an agent", handleSyscollector},
