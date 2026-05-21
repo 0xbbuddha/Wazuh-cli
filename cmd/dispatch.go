@@ -24,6 +24,7 @@ func init() {
 		"cluster":      {"Cluster status and nodes", handleCluster},
 		"config":       {"Show or initialize configuration", handleConfig},
 		"dashboard":    {"Interactive TUI dashboard", handleDashboard},
+		"decoder":      {"Browse and inspect Wazuh decoders", handleDecoder},
 		"groups":       {"Manage agent groups", handleGroups},
 		"logtest":      {"Test a log against Wazuh rules", handleLogtest},
 		"manager":      {"Manager information and status", handleManager},
