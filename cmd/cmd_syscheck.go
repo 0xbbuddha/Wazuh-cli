@@ -23,6 +23,8 @@ func handleSyscheck(args []string) {
 		syscheckLast(args[1:])
 	case "scan":
 		syscheckScan(args[1:])
+	case "clear":
+		syscheckClear(args[1:])
 	default:
 		printUnknownSub("syscheck", args[0])
 	}
@@ -136,6 +138,26 @@ func syscheckLast(args []string) {
 	} else if scan.Start != "" {
 		printWarn("Scan in progress or incomplete")
 	}
+}
+
+func syscheckClear(args []string) {
+	if !needsManager() {
+		return
+	}
+	if len(args) == 0 {
+		printErr(fmt.Errorf("usage: syscheck clear <agent_id>"))
+		return
+	}
+	agentID := args[0]
+	if !promptConfirm(fmt.Sprintf("Clear FIM database for agent %s? This cannot be undone.", agentID)) {
+		return
+	}
+	sc := api.NewSyscheckAPI(managerClient)
+	if err := sc.Clear(agentID); err != nil {
+		printErr(err)
+		return
+	}
+	printOK(fmt.Sprintf("FIM database cleared for agent %s", agentID))
 }
 
 func syscheckScan(args []string) {
