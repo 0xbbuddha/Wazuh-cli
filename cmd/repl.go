@@ -99,6 +99,7 @@ func buildCompleter() *readline.PrefixCompleter {
 			readline.PcItem("files"),
 			readline.PcItem("last"),
 			readline.PcItem("scan"),
+			readline.PcItem("clear"),
 		),
 		readline.PcItem("syscollector",
 			readline.PcItem("hardware"),
