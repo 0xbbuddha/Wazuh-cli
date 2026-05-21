@@ -83,6 +83,10 @@ var subHelp = map[string][]struct{ sub, desc string }{
 	"dashboard": {
 		{"(no subcommand)", "Launch the interactive TUI [--refresh N]"},
 	},
+	"decoder": {
+		{"list", "List enabled decoders [--search NAME] [--limit N] [--page N]"},
+		{"show <name>", "Show full details for a decoder (parent, regex, order, prematch)"},
+	},
 	"groups": {
 		{"list", "List all groups"},
 		{"agents <group>", "List agents in a group"},

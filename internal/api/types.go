@@ -198,6 +198,25 @@ type Process struct {
 	NLWP   int    `json:"nlwp"`
 }
 
+// --- Decoder types ---
+
+type Decoder struct {
+	Name     string        `json:"name"`
+	Filename string        `json:"filename"`
+	Relative string        `json:"relative_dirname"`
+	Position int           `json:"position"`
+	Status   string        `json:"status"`
+	Details  DecoderDetail `json:"details"`
+}
+
+type DecoderDetail struct {
+	Parent      string `json:"parent"`
+	Prematch    string `json:"prematch"`
+	ProgramName string `json:"program_name"`
+	Regex       string `json:"regex"`
+	Order       string `json:"order"`
+}
+
 // --- Rules types ---
 
 type Rule struct {
