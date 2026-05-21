@@ -49,8 +49,7 @@ func (g *GroupsAPI) Assign(agentID, groupID string) error {
 }
 
 func (g *GroupsAPI) Unassign(agentID, groupID string) error {
-	path := fmt.Sprintf("/agents/group?agents_list=%s&groups_list=%s",
-		url.QueryEscape(agentID), url.QueryEscape(groupID))
+	path := fmt.Sprintf("/agents/%s/group/%s", url.PathEscape(agentID), url.PathEscape(groupID))
 	return g.c.Delete(path, nil)
 }
 
