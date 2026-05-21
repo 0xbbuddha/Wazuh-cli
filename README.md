@@ -2,7 +2,7 @@
 
 [![Go](https://img.shields.io/badge/Go-1.26+-00ADD8?style=for-the-badge&logo=go)](https://golang.org)
 [![Release](https://img.shields.io/github/v/release/0xbbuddha/wazuh-cli?style=for-the-badge&color=blue)](https://github.com/0xbbuddha/wazuh-cli/releases)
-[![License](https://img.shields.io/badge/License-MIT-green?style=for-the-badge)](./LICENSE)
+[![License](https://img.shields.io/badge/License-MIT-green?style=for-the-badge)](./COPYING)
 
 Interactive REPL for the **Wazuh REST API** (v4.x), written in Go.
 
