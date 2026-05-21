@@ -25,7 +25,13 @@ It talks to two endpoints: the **Wazuh Manager API** (port 55000) for configurat
 
 ## Installation
 
-Download the binary for your platform from the [Releases](../../releases) page, or build from source:
+**One-line install (Linux / macOS):**
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/0xbbuddha/wazuh-cli/master/install.sh | bash
+```
+
+Or download the binary for your platform from the [Releases](../../releases) page, or build from source:
 
 ```bash
 git clone https://github.com/0xbbuddha/wazuh-cli
@@ -33,7 +39,7 @@ cd wazuh-cli
 make build
 ```
 
-**Requirements:** Go 1.22+
+**Requirements:** Go 1.26+
 
 ---
 
@@ -91,7 +97,8 @@ Authentication is handled automatically - JWT tokens are fetched on connect and 
 | `syscollector` | Hardware, OS, packages, ports, processes, network |
 | `cluster` | Cluster status, nodes, health |
 | `ar` | List and run active response actions |
-| `syscheck` | FIM events, last scan info, trigger scan |
+| `decoder` | Browse and inspect Wazuh decoders |
+| `syscheck` | FIM events, last scan info, trigger scan, clear results |
 | `logtest` | Test log lines against the rules engine |
 | `dashboard` | Live TUI: agents, alerts, vulnerabilities, SCA, FIM |
 | `config` | Show or reinitialize configuration |
