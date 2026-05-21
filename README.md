@@ -1,5 +1,10 @@
 # wazuh-cli
 
+[![Go](https://img.shields.io/badge/Go-1.22+-00ADD8?style=for-the-badge&logo=go)](https://golang.org)
+[![Release](https://img.shields.io/github/v/release/0xbbuddha/wazuh-cli?style=for-the-badge&color=blue)](https://github.com/0xbbuddha/wazuh-cli/releases)
+[![License](https://img.shields.io/badge/License-MIT-green?style=for-the-badge)](./LICENSE)
+[![Go Report Card](https://goreportcard.com/badge/github.com/0xbbuddha/wazuh-cli?style=for-the-badge)](https://goreportcard.com/report/github.com/0xbbuddha/wazuh-cli)
+
 Interactive REPL for the **Wazuh REST API** (v4.x), written in Go.
 
 ```
@@ -87,8 +92,9 @@ Authentication is handled automatically - JWT tokens are fetched on connect and 
 | `syscollector` | Hardware, OS, packages, ports, processes, network |
 | `cluster` | Cluster status, nodes, health |
 | `ar` | List and run active response actions |
+| `syscheck` | FIM events, last scan info, trigger scan |
 | `logtest` | Test log lines against the rules engine |
-| `dashboard` | Live TUI: agents, alerts, vulnerabilities |
+| `dashboard` | Live TUI: agents, alerts, vulnerabilities, SCA, FIM |
 | `config` | Show or reinitialize configuration |
 
 Type `help` inside the REPL for a full reference, or `help <command>` for details on a specific command.

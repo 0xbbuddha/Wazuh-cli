@@ -22,7 +22,7 @@ func (s *SyscheckAPI) Files(agentID, event, search string, limit, offset int) ([
 		params.Set("offset", fmt.Sprintf("%d", offset))
 	}
 	if event != "" {
-		params.Set("type", event)
+		params.Set("q", "event="+event)
 	}
 	if search != "" {
 		params.Set("search", search)
