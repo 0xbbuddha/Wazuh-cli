@@ -1,5 +1,7 @@
 package api
 
+import "encoding/json"
+
 // APIResponse is the common envelope returned by the Wazuh manager REST API.
 type APIResponse[T any] struct {
 	Data    APIData[T] `json:"data"`
@@ -200,6 +202,28 @@ type Process struct {
 
 // --- Decoder types ---
 
+// DecoderField handles fields that the API returns as either a plain string
+// or an object {"pattern": "...", "offset": "..."}.
+type DecoderField string
+
+func (f *DecoderField) UnmarshalJSON(data []byte) error {
+	// plain string
+	var s string
+	if json.Unmarshal(data, &s) == nil {
+		*f = DecoderField(s)
+		return nil
+	}
+	// object - extract "pattern"
+	var obj struct {
+		Pattern string `json:"pattern"`
+	}
+	if json.Unmarshal(data, &obj) == nil {
+		*f = DecoderField(obj.Pattern)
+		return nil
+	}
+	return nil
+}
+
 type Decoder struct {
 	Name     string        `json:"name"`
 	Filename string        `json:"filename"`
@@ -210,11 +234,11 @@ type Decoder struct {
 }
 
 type DecoderDetail struct {
-	Parent      string `json:"parent"`
-	Prematch    string `json:"prematch"`
-	ProgramName string `json:"program_name"`
-	Regex       string `json:"regex"`
-	Order       string `json:"order"`
+	Parent      string       `json:"parent"`
+	Prematch    DecoderField `json:"prematch"`
+	ProgramName DecoderField `json:"program_name"`
+	Regex       DecoderField `json:"regex"`
+	Order       string       `json:"order"`
 }
 
 // --- Rules types ---

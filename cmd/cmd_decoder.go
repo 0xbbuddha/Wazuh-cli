@@ -62,7 +62,7 @@ func decoderList(args []string) {
 		t.Row(
 			output.Truncate(dec.Name, 30),
 			output.Dim(output.Truncate(dec.Details.Parent, 20)),
-			output.Dim(output.Truncate(dec.Details.ProgramName, 20)),
+			output.Dim(output.Truncate(string(dec.Details.ProgramName), 20)),
 			output.Dim(output.Truncate(dec.Filename, 35)),
 		)
 	}
@@ -101,13 +101,13 @@ func decoderShow(args []string) {
 		output.Field("Parent", dec.Details.Parent)
 	}
 	if dec.Details.ProgramName != "" {
-		output.Field("Program", dec.Details.ProgramName)
+		output.Field("Program", string(dec.Details.ProgramName))
 	}
 	if dec.Details.Prematch != "" {
-		output.Field("Prematch", dec.Details.Prematch)
+		output.Field("Prematch", string(dec.Details.Prematch))
 	}
 	if dec.Details.Regex != "" {
-		output.Field("Regex", dec.Details.Regex)
+		output.Field("Regex", string(dec.Details.Regex))
 	}
 	if dec.Details.Order != "" {
 		output.Field("Order", dec.Details.Order)
