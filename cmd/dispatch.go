@@ -26,6 +26,7 @@ func init() {
 		"dashboard":    {"Interactive TUI dashboard", handleDashboard},
 		"decoder":      {"Browse and inspect Wazuh decoders", handleDecoder},
 		"groups":       {"Manage agent groups", handleGroups},
+		"indices":      {"Manage Wazuh Indexer indices", handleIndex},
 		"logtest":      {"Test a log against Wazuh rules", handleLogtest},
 		"manager":      {"Manager information and status", handleManager},
 		"status":       {"Quick overview: manager, agents, indexer", handleStatus},

@@ -87,6 +87,10 @@ var subHelp = map[string][]struct{ sub, desc string }{
 		{"list", "List enabled decoders [--search NAME] [--limit N] [--page N]"},
 		{"show <name>", "Show full details for a decoder (parent, regex, order, prematch)"},
 	},
+	"indices": {
+		{"list", "List all wazuh-* indices [--filter NAME]"},
+		{"delete <name>", "Delete an index (irreversible, requires confirmation)"},
+	},
 	"groups": {
 		{"list", "List all groups"},
 		{"agents <group>", "List agents in a group"},

@@ -100,6 +100,7 @@ Authentication is handled automatically - JWT tokens are fetched on connect and 
 | `decoder` | Browse and inspect Wazuh decoders |
 | `syscheck` | FIM events, last scan info, trigger scan, clear results |
 | `logtest` | Test log lines against the rules engine |
+| `indices` | Manage Wazuh Indexer indices: list, delete |
 | `dashboard` | Live TUI: agents, alerts, vulnerabilities, SCA, FIM |
 | `config` | Show or reinitialize configuration |
 
