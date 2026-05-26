@@ -92,6 +92,7 @@ Authentication is handled automatically - JWT tokens are fetched on connect and 
 | `manager` | Manager info, daemon status, logs |
 | `alerts` | List alerts, search, heatmap, real-time watch mode |
 | `rules` | Browse and inspect Wazuh rules |
+| `rootcheck` | Rootcheck scan results, trigger scan, clear database |
 | `sca` | SCA policy results and check details |
 | `vuln` | Vulnerability inventory per agent |
 | `syscollector` | Hardware, OS, packages, ports, processes, network |

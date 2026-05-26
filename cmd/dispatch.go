@@ -31,6 +31,7 @@ func init() {
 		"manager":      {"Manager information and status", handleManager},
 		"mitre":        {"Browse MITRE ATT&CK techniques, tactics, groups and software", handleMitre},
 		"status":       {"Quick overview: manager, agents, indexer", handleStatus},
+		"rootcheck":    {"Rootcheck scan results and management", handleRootcheck},
 		"rules":        {"Browse detection rules", handleRules},
 		"sca":          {"Security Configuration Assessment results", handleSCA},
 		"syscollector": {"System inventory for an agent", handleSyscollector},

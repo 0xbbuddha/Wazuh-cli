@@ -118,6 +118,12 @@ var subHelp = map[string][]struct{ sub, desc string }{
 		{"software", "List malware and tools [--search NAME] [--limit N] [--page N]"},
 		{"show <id>", "Show full detail for a technique (T1059, T1059.001, ...)"},
 	},
+	"rootcheck": {
+		{"results <agent_id>", "List rootcheck results [--status passed|failed] [--search TEXT] [--limit N] [--page N]"},
+		{"last <agent_id>", "Show date of last rootcheck scan"},
+		{"scan <agent_id>", "Trigger a rootcheck scan on an agent"},
+		{"clear <agent_id>", "Wipe the rootcheck database for an agent (irreversible)"},
+	},
 	"rules": {
 		{"list", "List rules [--level N] [--group G] [--limit N]"},
 		{"get <id>", "Get details for a specific rule"},
