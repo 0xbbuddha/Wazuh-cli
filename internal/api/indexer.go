@@ -552,6 +552,65 @@ func (ic *IndexerClient) AlertsFiltered(query string, minLevel int, agentID stri
 	return alerts, result.Hits.Total.Value, nil
 }
 
+// IndexInfo holds metadata for a single OpenSearch index.
+type IndexInfo struct {
+	Index     string `json:"index"`
+	Status    string `json:"status"`
+	Health    string `json:"health"`
+	DocsCount string `json:"docs.count"`
+	StoreSize string `json:"store.size"`
+	PriSize   string `json:"pri.store.size"`
+}
+
+// Indices returns all wazuh-* indices sorted by name descending.
+func (ic *IndexerClient) Indices() ([]IndexInfo, error) {
+	req, err := http.NewRequest(http.MethodGet,
+		ic.baseURL+"/_cat/indices/wazuh-*?format=json&s=index:desc&h=index,status,health,docs.count,store.size,pri.store.size",
+		nil)
+	if err != nil {
+		return nil, err
+	}
+	req.SetBasicAuth(ic.username, ic.password)
+
+	resp, err := ic.httpClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("indexer request failed: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		b, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("indexer HTTP %d: %s", resp.StatusCode, b)
+	}
+
+	var result []IndexInfo
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return nil, err
+	}
+	return result, nil
+}
+
+// DeleteIndex removes the given index by name.
+func (ic *IndexerClient) DeleteIndex(name string) error {
+	req, err := http.NewRequest(http.MethodDelete, ic.baseURL+"/"+name, nil)
+	if err != nil {
+		return err
+	}
+	req.SetBasicAuth(ic.username, ic.password)
+
+	resp, err := ic.httpClient.Do(req)
+	if err != nil {
+		return fmt.Errorf("indexer request failed: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		b, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("indexer HTTP %d: %s", resp.StatusCode, b)
+	}
+	return nil
+}
+
 // Search performs a full-text search across alert logs and descriptions.
 func (ic *IndexerClient) Search(queryStr string, limit int) ([]Alert, int, error) {
 	query := AlertsQuery{
