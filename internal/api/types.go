@@ -328,6 +328,22 @@ type Vulnerability struct {
 	Type         string `json:"type"`
 }
 
+// --- Rootcheck types ---
+
+type RootcheckResult struct {
+	Status    string `json:"status"`
+	Event     string `json:"log"`
+	CIS       string `json:"cis"`
+	PCIDSS    string `json:"pci_dss"`
+	DateFirst string `json:"date_first"`
+	DateLast  string `json:"date_last"`
+}
+
+type RootcheckLastScan struct {
+	Start string `json:"start"`
+	End   string `json:"end"`
+}
+
 // --- Logtest types ---
 
 type LogtestRequest struct {
