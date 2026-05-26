@@ -111,6 +111,13 @@ var subHelp = map[string][]struct{ sub, desc string }{
 		{"status", "Show status of all Wazuh daemons"},
 		{"logs", "Show recent manager logs [--lines N]"},
 	},
+	"mitre": {
+		{"techniques", "List ATT&CK techniques [--search NAME] [--tactic TACTIC] [--limit N] [--page N]"},
+		{"tactics", "List all ATT&CK tactics [--search NAME]"},
+		{"groups", "List threat actor groups [--search NAME] [--limit N] [--page N]"},
+		{"software", "List malware and tools [--search NAME] [--limit N] [--page N]"},
+		{"show <id>", "Show full detail for a technique (T1059, T1059.001, ...)"},
+	},
 	"rules": {
 		{"list", "List rules [--level N] [--group G] [--limit N]"},
 		{"get <id>", "Get details for a specific rule"},

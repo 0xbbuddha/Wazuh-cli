@@ -99,6 +99,7 @@ Authentication is handled automatically - JWT tokens are fetched on connect and 
 | `ar` | List and run active response actions |
 | `decoder` | Browse and inspect Wazuh decoders |
 | `syscheck` | FIM events, last scan info, trigger scan, clear results |
+| `mitre` | Browse MITRE ATT&CK techniques, tactics, threat groups and software |
 | `logtest` | Test log lines against the rules engine |
 | `indices` | Manage Wazuh Indexer indices: list, delete |
 | `dashboard` | Live TUI: agents, alerts, vulnerabilities, SCA, FIM |

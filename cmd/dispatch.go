@@ -29,6 +29,7 @@ func init() {
 		"indices":      {"Manage Wazuh Indexer indices", handleIndex},
 		"logtest":      {"Test a log against Wazuh rules", handleLogtest},
 		"manager":      {"Manager information and status", handleManager},
+		"mitre":        {"Browse MITRE ATT&CK techniques, tactics, groups and software", handleMitre},
 		"status":       {"Quick overview: manager, agents, indexer", handleStatus},
 		"rules":        {"Browse detection rules", handleRules},
 		"sca":          {"Security Configuration Assessment results", handleSCA},
