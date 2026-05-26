@@ -241,6 +241,44 @@ type DecoderDetail struct {
 	Order       string       `json:"order"`
 }
 
+// --- MITRE ATT&CK types ---
+
+type MITRETechnique struct {
+	ID            string   `json:"id"`
+	ExternalID    string   `json:"external_id"`
+	Name          string   `json:"name"`
+	Description   string   `json:"description"`
+	Platforms     []string `json:"platforms"`
+	Tactics       []string `json:"tactics"`
+	Mitigations   []string `json:"mitigations"`
+	SubTechniques []string `json:"subtechniques"`
+}
+
+type MITRETactic struct {
+	ID         string `json:"id"`
+	Name       string `json:"name"`
+	ExternalID string `json:"external_id"`
+}
+
+
+type MITREGroup struct {
+	ID          string   `json:"id"`
+	Name        string   `json:"name"`
+	Description string   `json:"description"`
+	Aliases     []string `json:"aliases"`
+	Techniques  []string `json:"techniques"`
+	Software    []string `json:"software"`
+}
+
+type MITRESoftware struct {
+	ID          string   `json:"id"`
+	Name        string   `json:"name"`
+	Description string   `json:"description"`
+	Type        string   `json:"type"`
+	Platforms   []string `json:"platforms"`
+	Techniques  []string `json:"techniques"`
+}
+
 // --- Rules types ---
 
 type Rule struct {
