@@ -89,8 +89,9 @@ var subHelp = map[string][]struct{ sub, desc string }{
 		{"show <name>", "Show full details for a decoder (parent, regex, order, prematch)"},
 	},
 	"indices": {
-		{"list", "List all wazuh-* indices [--filter NAME]"},
+		{"list", "List all wazuh-* indices [--filter NAME] [--health red|yellow|green]"},
 		{"delete <name>", "Delete an index (irreversible, requires confirmation)"},
+		{"clean", "Find red indices, show safe vs protected, delete safe ones [--dry-run]"},
 	},
 	"groups": {
 		{"list", "List all groups"},
