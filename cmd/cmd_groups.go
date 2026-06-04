@@ -146,14 +146,26 @@ func groupsAssign(args []string) {
 		return
 	}
 	if len(args) < 2 {
-		printErr(fmt.Errorf("usage: groups assign <agent_id> <group_name>"))
+		printErr(fmt.Errorf("usage: groups assign <agent_id[,agent_id,...]> <group[,group,...]>"))
 		return
 	}
-	if err := api.NewGroupsAPI(managerClient).Assign(args[0], args[1]); err != nil {
-		printErr(err)
-		return
+	agentIDs := strings.Split(args[0], ",")
+	groups := strings.Split(args[1], ",")
+
+	g := api.NewGroupsAPI(managerClient)
+	var failed []string
+	for _, group := range groups {
+		group = strings.TrimSpace(group)
+		if err := g.Assign(agentIDs, group); err != nil {
+			printErr(fmt.Errorf("group %q: %w", group, err))
+			failed = append(failed, group)
+		} else {
+			printOK(fmt.Sprintf("agents [%s] assigned to group %q", strings.Join(agentIDs, ", "), group))
+		}
 	}
-	printOK(fmt.Sprintf("Agent %s assigned to group %q", args[0], args[1]))
+	if len(failed) > 0 {
+		printWarn(fmt.Sprintf("%d group(s) failed: %s", len(failed), strings.Join(failed, ", ")))
+	}
 }
 
 func groupsUnassign(args []string) {
@@ -161,14 +173,29 @@ func groupsUnassign(args []string) {
 		return
 	}
 	if len(args) < 2 {
-		printErr(fmt.Errorf("usage: groups unassign <agent_id> <group_name>"))
+		printErr(fmt.Errorf("usage: groups unassign <agent_id[,agent_id,...]> <group[,group,...]>"))
 		return
 	}
-	if err := api.NewGroupsAPI(managerClient).Unassign(args[0], args[1]); err != nil {
-		printErr(err)
-		return
+	agentIDs := strings.Split(args[0], ",")
+	groups := strings.Split(args[1], ",")
+
+	g := api.NewGroupsAPI(managerClient)
+	var failed []string
+	for _, agentID := range agentIDs {
+		agentID = strings.TrimSpace(agentID)
+		for _, group := range groups {
+			group = strings.TrimSpace(group)
+			if err := g.Unassign(agentID, group); err != nil {
+				printErr(fmt.Errorf("agent %s / group %q: %w", agentID, group, err))
+				failed = append(failed, agentID+"/"+group)
+			} else {
+				printOK(fmt.Sprintf("agent %s removed from group %q", agentID, group))
+			}
+		}
 	}
-	printOK(fmt.Sprintf("Agent %s removed from group %q", args[0], args[1]))
+	if len(failed) > 0 {
+		printWarn(fmt.Sprintf("%d operation(s) failed: %s", len(failed), strings.Join(failed, ", ")))
+	}
 }
 
 func groupsConfig(args []string) {
