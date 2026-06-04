@@ -157,6 +157,46 @@ func (ic *IndexerClient) Alerts(limit, minLevel int, agentID string) ([]Alert, i
 	return alerts, result.Hits.Total.Value, nil
 }
 
+// IndexerNode holds metadata for a single OpenSearch node from _cat/nodes.
+type IndexerNode struct {
+	Name        string `json:"name"`
+	IP          string `json:"ip"`
+	HeapPercent string `json:"heap.percent"`
+	RAMPercent  string `json:"ram.percent"`
+	CPU         string `json:"cpu"`
+	Master      string `json:"master"`
+	NodeRole    string `json:"node.role"`
+	Uptime      string `json:"uptime"`
+}
+
+// Nodes queries /_cat/nodes for per-node stats.
+func (ic *IndexerClient) Nodes() ([]IndexerNode, error) {
+	req, err := http.NewRequest(http.MethodGet,
+		ic.baseURL+"/_cat/nodes?format=json&h=name,ip,heap.percent,ram.percent,cpu,master,node.role,uptime",
+		nil)
+	if err != nil {
+		return nil, err
+	}
+	req.SetBasicAuth(ic.username, ic.password)
+
+	resp, err := ic.httpClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("indexer request failed: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		b, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("indexer HTTP %d: %s", resp.StatusCode, b)
+	}
+
+	var nodes []IndexerNode
+	if err := json.NewDecoder(resp.Body).Decode(&nodes); err != nil {
+		return nil, err
+	}
+	return nodes, nil
+}
+
 // IndexerClusterHealth holds OpenSearch cluster health data.
 type IndexerClusterHealth struct {
 	ClusterName            string  `json:"cluster_name"`

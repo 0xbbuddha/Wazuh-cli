@@ -25,6 +25,8 @@ func handleCluster(args []string) {
 		clusterHealth(args[1:])
 	case "indexer":
 		clusterIndexer(args[1:])
+	case "indexer-nodes":
+		clusterIndexerNodes(args[1:])
 	default:
 		printUnknownSub("cluster", args[0])
 	}
@@ -156,6 +158,39 @@ func clusterIndexer(args []string) {
 	if h.TimedOut {
 		printWarn("cluster health check timed out")
 	}
+}
+
+func clusterIndexerNodes(args []string) {
+	if !needsIndexer() {
+		return
+	}
+	fs := flag.NewFlagSet("cluster indexer-nodes", flag.ContinueOnError)
+	outFmt := fs.String("o", "table", "Output format: table or json")
+	if err := fs.Parse(args); err != nil {
+		return
+	}
+	output.Format = *outFmt
+
+	nodes, err := indexerClient.Nodes()
+	if err != nil {
+		printErr(err)
+		return
+	}
+	if output.Format == "json" {
+		output.JSON(nodes)
+		return
+	}
+
+	output.ShowCount(len(nodes), len(nodes), "indexer nodes")
+	t := output.NewTable("NAME", "IP", "ROLE", "MASTER", "HEAP%", "RAM%", "CPU%", "UPTIME")
+	for _, n := range nodes {
+		master := output.Dim(n.Master)
+		if n.Master == "*" {
+			master = color.New(color.FgYellow, color.Bold).Sprint("*")
+		}
+		t.Row(n.Name, output.Dim(n.IP), n.NodeRole, master, n.HeapPercent, n.RAMPercent, n.CPU, output.Dim(n.Uptime))
+	}
+	t.Flush()
 }
 
 func isClusterDisabled(err error) bool {
