@@ -78,6 +78,7 @@ func buildCompleter() *readline.PrefixCompleter {
 		readline.PcItem("indices",
 			readline.PcItem("list"),
 			readline.PcItem("delete"),
+			readline.PcItem("clean"),
 		),
 		readline.PcItem("groups",
 			readline.PcItem("list"),
