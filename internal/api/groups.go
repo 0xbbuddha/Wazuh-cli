@@ -42,15 +42,28 @@ func (g *GroupsAPI) Delete(name string) error {
 	return g.c.Delete("/groups?groups_list="+url.QueryEscape(name), nil)
 }
 
-func (g *GroupsAPI) Assign(agentID, groupID string) error {
+// Assign assigns a list of agents to a single group in one API call.
+func (g *GroupsAPI) Assign(agentIDs []string, groupID string) error {
 	path := fmt.Sprintf("/agents/group?agents_list=%s&group_id=%s",
-		url.QueryEscape(agentID), url.QueryEscape(groupID))
+		url.QueryEscape(joinIDs(agentIDs)), url.QueryEscape(groupID))
 	return g.c.PutDecode(path, struct{}{}, nil)
 }
 
+// Unassign removes a single agent from a single group.
 func (g *GroupsAPI) Unassign(agentID, groupID string) error {
 	path := fmt.Sprintf("/agents/%s/group/%s", url.PathEscape(agentID), url.PathEscape(groupID))
 	return g.c.Delete(path, nil)
+}
+
+func joinIDs(ids []string) string {
+	result := ""
+	for i, id := range ids {
+		if i > 0 {
+			result += ","
+		}
+		result += id
+	}
+	return result
 }
 
 // GetConfig returns the raw XML content of the group's agent.conf.
