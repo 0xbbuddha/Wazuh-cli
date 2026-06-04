@@ -75,6 +75,7 @@ var subHelp = map[string][]struct{ sub, desc string }{
 		{"nodes", "List cluster nodes"},
 		{"health", "Show cluster health"},
 		{"indexer", "Show OpenSearch/Indexer cluster health"},
+		{"indexer-nodes", "List OpenSearch nodes with heap, RAM, CPU, uptime"},
 	},
 	"config": {
 		{"show", "Display current configuration"},

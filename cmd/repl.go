@@ -64,6 +64,7 @@ func buildCompleter() *readline.PrefixCompleter {
 			readline.PcItem("nodes"),
 			readline.PcItem("health"),
 			readline.PcItem("indexer"),
+			readline.PcItem("indexer-nodes"),
 		),
 		readline.PcItem("config",
 			readline.PcItem("show"),
